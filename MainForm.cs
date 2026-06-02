@@ -57,8 +57,21 @@ namespace TempHumidityMonitor
             timeQueue = new Queue<DateTime>();
             InitializeComponent();
             this.Load += MainForm_Load;
-            initControls();
-            LoadSettings();
+            // 设计模式下跳过运行时初始化，避免空引用异常
+            if (!IsDesignMode())
+            {
+                initControls();
+                LoadSettings();
+            }
+        }
+
+        private bool IsDesignMode()
+        {
+            if (System.ComponentModel.LicenseManager.UsageMode == System.ComponentModel.LicenseUsageMode.Designtime)
+                return true;
+            if (System.Diagnostics.Process.GetCurrentProcess().ProcessName == "devenv")
+                return true;
+            return DesignMode;
         }
 
         private void MainForm_Load(object sender, EventArgs e)
