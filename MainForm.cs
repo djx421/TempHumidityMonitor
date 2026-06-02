@@ -12,6 +12,9 @@ using TempHumidityMonitor.Properties;
 
 namespace TempHumidityMonitor
 {
+    // 此窗体使用编程式UI，设计器无法渲染。
+    // 运行程序后可通过"模拟模式"查看界面。
+    [System.ComponentModel.DesignerCategory("Code")]
     public partial class MainForm : Form
     {
         // ==================== 字段 ====================
