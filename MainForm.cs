@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Data.SQLite;
 using System.IO.Ports;
 using System.Linq;
 using System.Text;
@@ -24,6 +25,7 @@ namespace TempHumidityMonitor
         private int dataCount = 0;
         private List<byte> receiveBuffer = new List<byte>();
         private string logFilePath;
+        private string dbConnStr = @"Data Source=F:\set\TempHumidityData.db;Version=3;";
         private bool isComOpen = false;
         private bool isSimMode = false;
         private DateTime lastReceiveTime = DateTime.MinValue;
@@ -504,6 +506,7 @@ namespace TempHumidityMonitor
             AddDataPoint(simTemp, simHumi);
             if (chkEnableAlarm.Checked) CheckAlarm(simTemp, simHumi);
             if (chkDataLog.Checked) LogDataToFile(simTemp, simHumi);
+            SaveToDatabase(simTemp, simHumi, true);
             this.BeginInvoke(new Action(() => updateUI(simTemp, simHumi)));
         }
 
@@ -575,6 +578,7 @@ namespace TempHumidityMonitor
                 AddDataPoint(t, h);
                 if (chkEnableAlarm.Checked) CheckAlarm(t, h);
                 if (chkDataLog.Checked) LogDataToFile(t, h);
+                SaveToDatabase(t, h, false);
                 this.BeginInvoke(new Action(() => updateUI(t, h)));
                 this.BeginInvoke(new Action(() =>
                 { lblStatus.Text = "数据正常 - " + lastReceiveTime.ToString("HH:mm:ss"); lblStatus.ForeColor = Color.Green; }));
@@ -761,6 +765,42 @@ namespace TempHumidityMonitor
                     string.Format("[{0:HH:mm:ss}] {1}\n", DateTime.Now, msg), Encoding.UTF8);
             }
             catch { }
+        }
+
+        // ==================== 数据库存储 ====================
+        private void SaveToDatabase(float temp, float humi, bool isSim)
+        {
+            try
+            {
+                bool isAlarm = false;
+                string alarmMsg = null;
+                if (chkEnableAlarm.Checked)
+                {
+                    float tH = (float)nudTempHigh.Value, tL = (float)nudTempLow.Value;
+                    float hH = (float)nudHumiHigh.Value, hL = (float)nudHumiLow.Value;
+                    if (temp > tH || temp < tL || humi > hH || humi < hL)
+                    { isAlarm = true; alarmMsg = string.Format("T:{0:F1}/H:{1:F1}", temp, humi); }
+                }
+
+                using (var conn = new SQLiteConnection(dbConnStr))
+                {
+                    conn.Open();
+                    string sql = @"INSERT INTO sensor_data (timestamp, temperature, humidity, read_mode, is_simulated, is_alarm, alarm_msg)
+                                   VALUES (@ts, @t, @h, @mode, @sim, @alarm, @msg)";
+                    using (var cmd = new SQLiteCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@ts", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                        cmd.Parameters.AddWithValue("@t", temp);
+                        cmd.Parameters.AddWithValue("@h", humi);
+                        cmd.Parameters.AddWithValue("@mode", cbReadMode.Text);
+                        cmd.Parameters.AddWithValue("@sim", isSim ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@alarm", isAlarm ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@msg", (object)alarmMsg ?? DBNull.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch { /* 数据库写入失败不影响主流程 */ }
         }
 
         // ==================== 导出CSV ====================
