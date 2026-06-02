@@ -37,14 +37,15 @@ namespace TempHumidityMonitor
             tempQueue = new Queue<float>();
             humiQueue = new Queue<float>();
             timeQueue = new Queue<DateTime>();
+
+            // 设计器安全的最小初始化
             InitializeComponent();
 
-            // 绑定所有事件处理器
-            WireUpEvents();
-
-            // 设计模式下跳过运行时初始化
+            // 运行时：构建完整UI + 初始化
             if (!IsDesignMode())
             {
+                BuildFullUI();
+                WireUpEvents();
                 InitAfterDesign();
             }
         }
@@ -58,17 +59,295 @@ namespace TempHumidityMonitor
             return DesignMode;
         }
 
+        // ==================== 完整UI构建（仅运行时） ====================
+        private void BuildFullUI()
+        {
+            // 创建顶层容器（Designer.cs中只声明未实例化）
+            splitContainer1 = new SplitContainer();
+            splitContainer1.Dock = DockStyle.Fill;
+            splitContainer1.FixedPanel = FixedPanel.Panel1;
+
+            statusStrip1 = new StatusStrip();
+            statusStrip1.Dock = DockStyle.Bottom;
+            tsslStatus = new ToolStripStatusLabel("● 串口未打开") { ForeColor = System.Drawing.Color.Gray, Width = 140 };
+            tsslSend = new ToolStripStatusLabel("发送: 0");
+            tsslRecv = new ToolStripStatusLabel("接收: 0");
+            tsslError = new ToolStripStatusLabel("错误: 0") { ForeColor = System.Drawing.Color.Orange };
+            tsslTime = new ToolStripStatusLabel("00:00:00");
+            statusStrip1.Items.AddRange(new ToolStripItem[] { tsslStatus, tsslSend, tsslRecv, tsslError, new ToolStripStatusLabel("  "), tsslTime });
+
+            this.SuspendLayout();
+            splitContainer1.SuspendLayout();
+
+            // Chart（右侧Panel2）
+            chart1 = new Chart();
+            chart1.Dock = DockStyle.Fill;
+            {
+                ChartArea area = new ChartArea("MainArea");
+                area.AxisX.Title = "采样点序号";
+                area.AxisX.TitleFont = new Font("Microsoft YaHei", 9);
+                area.AxisX.MajorGrid.LineColor = Color.LightGray;
+                area.AxisY.Title = "数值";
+                area.AxisY.TitleFont = new Font("Microsoft YaHei", 9);
+                area.AxisY.MajorGrid.LineColor = Color.LightGray;
+                area.AxisY.Minimum = -10; area.AxisY.Maximum = 100; area.AxisY.Interval = 10;
+                area.CursorX.IsUserEnabled = true; area.CursorX.IsUserSelectionEnabled = true;
+                area.AxisX.ScrollBar.Enabled = true; area.AxisX.ScaleView.Zoomable = true;
+                chart1.ChartAreas.Add(area);
+
+                Legend legend = new Legend("Legend") { Docking = Docking.Top, Font = new Font("Microsoft YaHei", 9) };
+                chart1.Legends.Add(legend);
+
+                Series t = new Series("温度")
+                {
+                    ChartType = SeriesChartType.Spline, Color = Color.Red, BorderWidth = 2,
+                    MarkerStyle = MarkerStyle.Circle, MarkerSize = 6, MarkerColor = Color.Red, LegendText = "温度 (℃)"
+                };
+                chart1.Series.Add(t);
+
+                Series h = new Series("湿度")
+                {
+                    ChartType = SeriesChartType.Spline, Color = Color.Blue, BorderWidth = 2,
+                    MarkerStyle = MarkerStyle.Diamond, MarkerSize = 6, MarkerColor = Color.Blue, LegendText = "湿度 (%)"
+                };
+                chart1.Series.Add(h);
+            }
+            splitContainer1.Panel2.Controls.Add(chart1);
+
+            // 左侧Panel1
+            Panel pnlLeft = splitContainer1.Panel1;
+            pnlLeft.Padding = new Padding(4);
+            int top = 4;
+            int gbWidth = 283;  // 统一GroupBox宽度
+            int pad = 4;        // 面板间距
+
+            // 模拟模式 CheckBox
+            chkSimMode = new CheckBox();
+            chkSimMode.Text = "模拟模式（无需硬件演示）";
+            chkSimMode.Location = new Point(4, top);
+            chkSimMode.Size = new Size(gbWidth, 20);
+            pnlLeft.Controls.Add(chkSimMode);
+            top += 22;
+
+            // 串口设置
+            gbSerial = new GroupBox();
+            gbSerial.Text = "串口设置";
+            gbSerial.Location = new Point(4, top);
+            gbSerial.Size = new Size(gbWidth, 122);
+            {
+                // 绝对定位替代TLP，消除边框裁剪问题
+                int lx = 60; // 标签列宽
+                int ly = 20; // 起始Y（GroupBox标题下方）
+                int lh = 24; // 行高
+                Label lblPort = new Label() { Text = "串口号:", TextAlign = ContentAlignment.MiddleRight, Location = new Point(4, ly), Size = new Size(52, lh) };
+                gbSerial.Controls.Add(lblPort);
+                cbComPort = new ComboBox() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 165, Location = new Point(lx, ly) };
+                gbSerial.Controls.Add(cbComPort);
+                btnRefreshPorts = new Button() { Text = "刷新", Size = new Size(52, lh), Location = new Point(lx + 170, ly) };
+                gbSerial.Controls.Add(btnRefreshPorts);
+
+                ly += 30;
+                Label lblBaud = new Label() { Text = "波特率:", TextAlign = ContentAlignment.MiddleRight, Location = new Point(4, ly), Size = new Size(52, lh) };
+                gbSerial.Controls.Add(lblBaud);
+                cbBaudRate = new ComboBox() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220, Location = new Point(lx, ly) };
+                cbBaudRate.Items.AddRange(new object[] { "4800", "9600", "19200", "38400", "57600", "115200" });
+                cbBaudRate.SelectedIndex = 1;
+                gbSerial.Controls.Add(cbBaudRate);
+
+                ly += 30;
+                btnOpenCloseCom = new Button() { Text = "打开串口", Size = new Size(110, lh + 2), Location = new Point(28, ly) };
+                gbSerial.Controls.Add(btnOpenCloseCom);
+                btnManualSend = new Button() { Text = "手动采集", Size = new Size(110, lh + 2), Location = new Point(144, ly) };
+                gbSerial.Controls.Add(btnManualSend);
+            }
+            pnlLeft.Controls.Add(gbSerial);
+            top += 122 + pad;
+
+            // 采集设置
+            gbCollect = new GroupBox();
+            gbCollect.Text = "采集设置";
+            gbCollect.Location = new Point(4, top);
+            gbCollect.Size = new Size(gbWidth, 100);
+            {
+                TableLayoutPanel tlp = TLP(2, 3, 28, 70);
+                gbCollect.Controls.Add(tlp);
+
+                tlp.Controls.Add(Lbl("读取模式:"), 0, 0);
+                cbReadMode = new ComboBox() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+                cbReadMode.Items.AddRange(new object[] { "一次读取（浮点格式）", "一次读取（整型格式）", "单独读取温度（浮点）", "单独读取湿度（浮点）", "单独读取温度（整型）", "单独读取湿度（整型）" });
+                cbReadMode.SelectedIndex = 0;
+                tlp.Controls.Add(cbReadMode, 1, 0);
+
+                tlp.Controls.Add(Lbl("间隔(ms):"), 0, 1);
+                nudInterval = new NumericUpDown() { Minimum = 200, Maximum = 60000, Increment = 100, Value = 1000, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
+                tlp.Controls.Add(nudInterval, 1, 1);
+
+                tlp.Controls.Add(Lbl("最大点数:"), 0, 2);
+                nudMaxPoints = new NumericUpDown() { Minimum = 10, Maximum = 500, Increment = 10, Value = 30, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
+                tlp.Controls.Add(nudMaxPoints, 1, 2);
+            }
+            pnlLeft.Controls.Add(gbCollect);
+            top += 100 + pad;
+
+            // 当前数据
+            gbCurrent = new GroupBox();
+            gbCurrent.Text = "当前数据";
+            gbCurrent.Location = new Point(4, top);
+            gbCurrent.Size = new Size(gbWidth, 100);
+            {
+                TableLayoutPanel tlp = TLP(2, 3, 26, 50);
+                gbCurrent.Controls.Add(tlp);
+
+                tlp.Controls.Add(Lbl("温度:"), 0, 0);
+                lblTempValue = new Label() { Text = "--.- ℃", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Microsoft YaHei", 11F, FontStyle.Bold), ForeColor = Color.Red };
+                tlp.Controls.Add(lblTempValue, 1, 0);
+
+                tlp.Controls.Add(Lbl("湿度:"), 0, 1);
+                lblHumiValue = new Label() { Text = "--.- %", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Microsoft YaHei", 11F, FontStyle.Bold), ForeColor = Color.Blue };
+                tlp.Controls.Add(lblHumiValue, 1, 1);
+
+                tlp.Controls.Add(Lbl("更新:"), 0, 2);
+                lblUpdateTime = new Label() { Text = "--", TextAlign = ContentAlignment.MiddleCenter };
+                tlp.Controls.Add(lblUpdateTime, 1, 2);
+            }
+            pnlLeft.Controls.Add(gbCurrent);
+            top += 100 + pad;
+
+            // 统计信息
+            gbStats = new GroupBox();
+            gbStats.Text = "统计信息";
+            gbStats.Location = new Point(4, top);
+            gbStats.Size = new Size(gbWidth, 105);
+            {
+                TableLayoutPanel tlp = TLP(4, 3, 24, 42);
+                gbStats.Controls.Add(tlp);
+
+                tlp.Controls.Add(Lbl("温度:"), 0, 0);
+                lblTempMin = new Label() { Text = "最小:--", ForeColor = Color.DarkRed, TextAlign = ContentAlignment.MiddleCenter };
+                lblTempMax = new Label() { Text = "最大:--", ForeColor = Color.DarkRed, TextAlign = ContentAlignment.MiddleCenter };
+                lblTempAvg = new Label() { Text = "平均:--", ForeColor = Color.DarkRed, TextAlign = ContentAlignment.MiddleCenter };
+                tlp.Controls.Add(lblTempMin, 1, 0); tlp.Controls.Add(lblTempMax, 2, 0); tlp.Controls.Add(lblTempAvg, 3, 0);
+
+                tlp.Controls.Add(Lbl("湿度:"), 0, 1);
+                lblHumiMin = new Label() { Text = "最小:--", ForeColor = Color.DarkBlue, TextAlign = ContentAlignment.MiddleCenter };
+                lblHumiMax = new Label() { Text = "最大:--", ForeColor = Color.DarkBlue, TextAlign = ContentAlignment.MiddleCenter };
+                lblHumiAvg = new Label() { Text = "平均:--", ForeColor = Color.DarkBlue, TextAlign = ContentAlignment.MiddleCenter };
+                tlp.Controls.Add(lblHumiMin, 1, 1); tlp.Controls.Add(lblHumiMax, 2, 1); tlp.Controls.Add(lblHumiAvg, 3, 1);
+
+                btnClearStats = new Button() { Text = "重置统计", Size = new Size(70, 22) };
+                tlp.Controls.Add(btnClearStats, 0, 2);
+                tlp.SetColumnSpan(btnClearStats, 4);
+            }
+            pnlLeft.Controls.Add(gbStats);
+            top += 105 + pad;
+
+            // 报警设置
+            gbAlarm = new GroupBox();
+            gbAlarm.Text = "报警设置";
+            gbAlarm.Location = new Point(4, top);
+            gbAlarm.Size = new Size(gbWidth, 158);
+            {
+                TableLayoutPanel tlp = TLP(2, 5, 24, 70);
+                gbAlarm.Controls.Add(tlp);
+
+                chkEnableAlarm = new CheckBox() { Text = "启用报警", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
+                tlp.Controls.Add(chkEnableAlarm, 1, 0);
+
+                tlp.Controls.Add(Lbl("温度上限:"), 0, 1);
+                nudTempHigh = new NumericUpDown() { Minimum = -50, Maximum = 150, Increment = 0.5M, Value = 40, DecimalPlaces = 1, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
+                tlp.Controls.Add(nudTempHigh, 1, 1);
+
+                tlp.Controls.Add(Lbl("温度下限:"), 0, 2);
+                nudTempLow = new NumericUpDown() { Minimum = -50, Maximum = 150, Increment = 0.5M, Value = 0, DecimalPlaces = 1, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
+                tlp.Controls.Add(nudTempLow, 1, 2);
+
+                tlp.Controls.Add(Lbl("湿度上限:"), 0, 3);
+                nudHumiHigh = new NumericUpDown() { Minimum = 0, Maximum = 100, Increment = 1, Value = 80, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
+                tlp.Controls.Add(nudHumiHigh, 1, 3);
+
+                tlp.Controls.Add(Lbl("湿度下限:"), 0, 4);
+                nudHumiLow = new NumericUpDown() { Minimum = 0, Maximum = 100, Increment = 1, Value = 20, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
+                tlp.Controls.Add(nudHumiLow, 1, 4);
+            }
+            pnlLeft.Controls.Add(gbAlarm);
+            top += 158 + pad;
+
+            // 数据管理
+            gbData = new GroupBox();
+            gbData.Text = "数据管理";
+            gbData.Location = new Point(4, top);
+            gbData.Size = new Size(gbWidth, 105);
+            {
+                chkDataLog = new CheckBox() { Text = "启用数据记录", Checked = true, TextAlign = ContentAlignment.MiddleLeft };
+                btnExportCSV = new Button() { Text = "导出CSV", TextAlign = ContentAlignment.MiddleCenter };
+                btnClearChart = new Button() { Text = "清除图表", TextAlign = ContentAlignment.MiddleCenter };
+
+                TableLayoutPanel tlp = TLP(1, 3, 28, 0);
+                gbData.Controls.Add(tlp);
+                tlp.Controls.Add(chkDataLog, 0, 0); chkDataLog.Dock = DockStyle.Fill;
+                tlp.Controls.Add(btnExportCSV, 0, 1); btnExportCSV.Dock = DockStyle.Fill;
+                tlp.Controls.Add(btnClearChart, 0, 2); btnClearChart.Dock = DockStyle.Fill;
+            }
+            pnlLeft.Controls.Add(gbData);
+            top += 105 + pad;
+
+            // 状态Label
+            lblStatus = new Label();
+            lblStatus.Text = "就绪"; lblStatus.ForeColor = Color.Gray;
+            lblStatus.Location = new Point(4, top); lblStatus.Size = new Size(270, 18);
+            pnlLeft.Controls.Add(lblStatus);
+
+            // 组件
+            timer1 = new Timer();
+            serialPort1 = new SerialPort();
+
+            // 添加到窗体
+            this.Controls.Add(splitContainer1);
+            this.Controls.Add(statusStrip1);
+
+            splitContainer1.ResumeLayout(false);
+            this.ResumeLayout(false);
+        }
+
+        // 辅助：快速创建 Label
+        private static Label Lbl(string text)
+        {
+            return new Label() { Text = text, TextAlign = ContentAlignment.MiddleRight };
+        }
+
+        // 辅助：快速创建 TableLayoutPanel
+        private static TableLayoutPanel TLP(int cols, int rows, int rowH, int col0w)
+        {
+            TableLayoutPanel tlp = new TableLayoutPanel();
+            tlp.Dock = DockStyle.Fill;
+            tlp.ColumnCount = cols;
+            tlp.RowCount = rows;
+            tlp.Padding = new Padding(4, 0, 4, 0);
+            if (col0w > 0)
+            {
+                tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, col0w));
+                for (int i = 1; i < cols; i++)
+                    tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100 / (cols - 1)));
+            }
+            for (int i = 0; i < rows; i++)
+                tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, rowH));
+            return tlp;
+        }
+
+        // ==================== 事件绑定 ====================
         private void WireUpEvents()
         {
             this.Load += MainForm_Load;
+            this.Shown += MainForm_Shown;
             this.FormClosing += MainForm_FormClosing;
+
+            chkSimMode.CheckedChanged += chkSimMode_CheckedChanged;
             btnRefreshPorts.Click += btnRefreshPorts_Click;
             btnOpenCloseCom.Click += btnOpenCloseCom_Click;
             btnManualSend.Click += btnManualSend_Click;
             btnClearStats.Click += btnClearStats_Click;
             btnExportCSV.Click += btnExportCSV_Click;
             btnClearChart.Click += btnClearChart_Click;
-            chkSimMode.CheckedChanged += chkSimMode_CheckedChanged;
             chkEnableAlarm.CheckedChanged += chkEnableAlarm_CheckedChanged;
             chkDataLog.CheckedChanged += chkDataLog_CheckedChanged;
             cbReadMode.SelectedIndexChanged += cbReadMode_SelectedIndexChanged;
@@ -87,7 +366,13 @@ namespace TempHumidityMonitor
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-            splitContainer1.SplitterDistance = 285;
+        }
+
+        private void MainForm_Shown(object sender, EventArgs e)
+        {
+            splitContainer1.SplitterDistance = 300;
+            splitContainer1.Panel1MinSize = 260;
+            splitContainer1.Panel2MinSize = 200;
         }
 
         // ==================== 初始化控件状态 ====================
@@ -115,8 +400,7 @@ namespace TempHumidityMonitor
 
             InitLogFile();
 
-            Timer timeTimer = new Timer();
-            timeTimer.Interval = 1000;
+            Timer timeTimer = new Timer { Interval = 1000 };
             timeTimer.Tick += (s, ev) => { tsslTime.Text = DateTime.Now.ToString("HH:mm:ss"); };
             timeTimer.Start();
         }
@@ -125,12 +409,11 @@ namespace TempHumidityMonitor
         private void RefreshComPorts()
         {
             string[] ports = SerialPort.GetPortNames();
-            string prevSelection = cbComPort.SelectedItem?.ToString();
             cbComPort.Items.Clear();
             if (ports.Length > 0)
             {
                 cbComPort.Items.AddRange(ports);
-                cbComPort.Text = prevSelection != null && cbComPort.Items.Contains(prevSelection) ? prevSelection : cbComPort.Items[0].ToString();
+                cbComPort.SelectedIndex = 0;
             }
             else { cbComPort.Items.Add("无可用串口"); cbComPort.SelectedIndex = 0; }
         }
@@ -142,9 +425,7 @@ namespace TempHumidityMonitor
         }
 
         private void btnOpenCloseCom_Click(object sender, EventArgs e)
-        {
-            if (isComOpen) closeComPort(); else openComPort();
-        }
+        { if (isComOpen) closeComPort(); else openComPort(); }
 
         private void openComPort()
         {
@@ -152,27 +433,17 @@ namespace TempHumidityMonitor
             {
                 string portName = cbComPort.Text;
                 if (string.IsNullOrEmpty(portName) || portName == "无可用串口") { ShowTip("请选择有效的串口号"); return; }
-
                 serialPort1.PortName = portName;
                 serialPort1.BaudRate = int.Parse(cbBaudRate.Text);
-                serialPort1.DataBits = 8;
-                serialPort1.StopBits = StopBits.One;
-                serialPort1.Parity = Parity.None;
-                serialPort1.ReadTimeout = 500;
-                serialPort1.WriteTimeout = 500;
+                serialPort1.DataBits = 8; serialPort1.StopBits = StopBits.One; serialPort1.Parity = Parity.None;
+                serialPort1.ReadTimeout = 500; serialPort1.WriteTimeout = 500;
                 serialPort1.Open();
                 isComOpen = true;
-                btnOpenCloseCom.Text = "关闭串口";
-                btnOpenCloseCom.BackColor = Color.LightCoral;
-                tsslStatus.Text = "● 串口已打开 - " + portName;
-                tsslStatus.ForeColor = Color.Green;
-                timer1.Interval = (int)nudInterval.Value;
-                timer1.Start();
-                cbComPort.Enabled = false;
-                btnRefreshPorts.Enabled = false;
-                cbBaudRate.Enabled = false;
-                lblStatus.Text = "串口已打开，正在采集数据...";
-                lblStatus.ForeColor = Color.Green;
+                btnOpenCloseCom.Text = "关闭串口"; btnOpenCloseCom.BackColor = Color.LightCoral;
+                tsslStatus.Text = "● 串口已打开 - " + portName; tsslStatus.ForeColor = Color.Green;
+                timer1.Interval = (int)nudInterval.Value; timer1.Start();
+                cbComPort.Enabled = false; btnRefreshPorts.Enabled = false; cbBaudRate.Enabled = false;
+                lblStatus.Text = "串口已打开，正在采集数据..."; lblStatus.ForeColor = Color.Green;
                 receiveBuffer.Clear();
             }
             catch (Exception ex) { ShowTip("打开串口失败: " + ex.Message); LogError("打开串口失败: " + ex.Message); }
@@ -182,18 +453,11 @@ namespace TempHumidityMonitor
         {
             try
             {
-                timer1.Stop();
-                if (serialPort1.IsOpen) serialPort1.Close();
-                isComOpen = false;
-                btnOpenCloseCom.Text = "打开串口";
-                btnOpenCloseCom.BackColor = SystemColors.Control;
-                tsslStatus.Text = "● 串口已关闭";
-                tsslStatus.ForeColor = Color.Gray;
-                cbComPort.Enabled = true;
-                btnRefreshPorts.Enabled = true;
-                cbBaudRate.Enabled = true;
-                lblStatus.Text = "串口已关闭";
-                lblStatus.ForeColor = Color.Gray;
+                timer1.Stop(); if (serialPort1.IsOpen) serialPort1.Close();
+                isComOpen = false; btnOpenCloseCom.Text = "打开串口"; btnOpenCloseCom.BackColor = SystemColors.Control;
+                tsslStatus.Text = "● 串口已关闭"; tsslStatus.ForeColor = Color.Gray;
+                cbComPort.Enabled = true; btnRefreshPorts.Enabled = true; cbBaudRate.Enabled = true;
+                lblStatus.Text = "串口已关闭"; lblStatus.ForeColor = Color.Gray;
             }
             catch (Exception ex) { LogError("关闭串口失败: " + ex.Message); }
         }
@@ -208,10 +472,8 @@ namespace TempHumidityMonitor
             {
                 if (isSimMode) { SimulateData(); return; }
                 if (!isComOpen || !serialPort1.IsOpen) return;
-                byte[] cmd = GetModbusCommand();
-                serialPort1.Write(cmd, 0, cmd.Length);
-                nSend++;
-                tsslSend.Text = "发送: " + nSend;
+                serialPort1.Write(GetModbusCommand(), 0, 8);
+                nSend++; tsslSend.Text = "发送: " + nSend;
             }
             catch (Exception ex) { nError++; tsslError.Text = "错误: " + nError; LogError("发送数据失败: " + ex.Message); }
         }
@@ -232,10 +494,10 @@ namespace TempHumidityMonitor
 
         private void SimulateData()
         {
-            float deltaT = (float)(simRandom.NextDouble() * 3.0 - 1.5);
-            simTemp += deltaT; simTemp = Math.Max(-20, Math.Min(80, simTemp));
-            float deltaH = (float)(simRandom.NextDouble() * 6.0 - 3.0);
-            simHumi += deltaH; simHumi = Math.Max(5, Math.Min(98, simHumi));
+            simTemp += (float)(simRandom.NextDouble() * 3.0 - 1.5);
+            simTemp = Math.Max(-20, Math.Min(80, simTemp));
+            simHumi += (float)(simRandom.NextDouble() * 6.0 - 3.0);
+            simHumi = Math.Max(5, Math.Min(98, simHumi));
             nSend++; nReceive++;
             tsslSend.Text = "发送: " + nSend; tsslRecv.Text = "接收: " + nReceive;
             lastReceiveTime = DateTime.Now;
@@ -261,7 +523,7 @@ namespace TempHumidityMonitor
                 btnOpenCloseCom.Enabled = false;
                 timer1.Interval = (int)nudInterval.Value; timer1.Start();
                 tsslStatus.Text = "● 模拟模式 - 演示数据"; tsslStatus.ForeColor = Color.Orange;
-                lblStatus.Text = "模拟模式运行中，数据为随机模拟值"; lblStatus.ForeColor = Color.Orange;
+                lblStatus.Text = "模拟模式运行中"; lblStatus.ForeColor = Color.Orange;
             }
             else
             {
@@ -277,72 +539,66 @@ namespace TempHumidityMonitor
         {
             try
             {
-                int bytesToRead = serialPort1.BytesToRead;
-                if (bytesToRead <= 0) return;
-                byte[] incoming = new byte[bytesToRead];
-                serialPort1.Read(incoming, 0, bytesToRead);
-                receiveBuffer.AddRange(incoming);
+                int n = serialPort1.BytesToRead;
+                if (n <= 0) return;
+                byte[] buf = new byte[n];
+                serialPort1.Read(buf, 0, n);
+                receiveBuffer.AddRange(buf);
                 while (receiveBuffer.Count >= 5)
                 {
                     if (receiveBuffer[0] != 0x01 || receiveBuffer[1] != 0x03) { receiveBuffer.RemoveAt(0); continue; }
-                    int dataLength = receiveBuffer[2];
-                    int totalLength = 3 + dataLength + 2;
-                    if (receiveBuffer.Count < totalLength) break;
-                    byte[] frame = new byte[totalLength];
-                    receiveBuffer.CopyTo(0, frame, 0, totalLength);
-                    receiveBuffer.RemoveRange(0, totalLength);
+                    int dLen = receiveBuffer[2];
+                    int tLen = 3 + dLen + 2;
+                    if (receiveBuffer.Count < tLen) break;
+                    byte[] frame = new byte[tLen];
+                    receiveBuffer.CopyTo(0, frame, 0, tLen);
+                    receiveBuffer.RemoveRange(0, tLen);
                     ProcessFrame(frame);
                 }
             }
-            catch (Exception ex) { LogError("接收数据处理异常: " + ex.Message); nError++; UpdateStatus(); }
+            catch (Exception ex) { LogError("接收异常: " + ex.Message); nError++; UpdateStatus(); }
         }
 
         private void serialPort1_ErrorReceived(object sender, SerialErrorReceivedEventArgs e)
-        {
-            nError++; tsslError.Text = "错误: " + nError; LogError("串口错误: " + e.EventType);
-        }
+        { nError++; tsslError.Text = "错误: " + nError; LogError("串口错误: " + e.EventType); }
 
-        // ==================== 数据处理 ====================
         private void ProcessFrame(byte[] buffer)
         {
             nReceive++; tsslRecv.Text = "接收: " + nReceive; lastReceiveTime = DateTime.Now;
             try
             {
                 if (!checkData(buffer)) { nError++; tsslError.Text = "错误: " + nError; return; }
-                float temp, humi;
-                getTempHumi(buffer, out temp, out humi);
-                if (temp < -40 || temp > 125 || humi < 0 || humi > 100)
-                {
-                    LogError(string.Format("数据超出合理范围: 温度={0:F1}, 湿度={1:F1}", temp, humi)); return;
-                }
-                AddDataPoint(temp, humi);
-                if (chkEnableAlarm.Checked) CheckAlarm(temp, humi);
-                if (chkDataLog.Checked) LogDataToFile(temp, humi);
-                this.BeginInvoke(new Action(() => updateUI(temp, humi)));
-                this.BeginInvoke(new Action(() => { lblStatus.Text = string.Format("数据正常 - {0}", lastReceiveTime.ToString("HH:mm:ss")); lblStatus.ForeColor = Color.Green; }));
+                float t, h;
+                getTempHumi(buffer, out t, out h);
+                if (t < -40 || t > 125 || h < 0 || h > 100)
+                { LogError(string.Format("数据超范围: T={0:F1} H={1:F1}", t, h)); return; }
+                AddDataPoint(t, h);
+                if (chkEnableAlarm.Checked) CheckAlarm(t, h);
+                if (chkDataLog.Checked) LogDataToFile(t, h);
+                this.BeginInvoke(new Action(() => updateUI(t, h)));
+                this.BeginInvoke(new Action(() =>
+                { lblStatus.Text = "数据正常 - " + lastReceiveTime.ToString("HH:mm:ss"); lblStatus.ForeColor = Color.Green; }));
             }
             catch (Exception ex)
             {
-                nError++; tsslError.Text = "错误: " + nError; LogError("数据帧处理异常: " + ex.Message);
-                this.BeginInvoke(new Action(() => { lblStatus.Text = "数据解析错误: " + ex.Message; lblStatus.ForeColor = Color.Red; }));
+                nError++; tsslError.Text = "错误: " + nError; LogError("帧处理异常: " + ex.Message);
+                this.BeginInvoke(new Action(() => { lblStatus.Text = "解析错误: " + ex.Message; lblStatus.ForeColor = Color.Red; }));
             }
         }
 
-        private void AddDataPoint(float temp, float humi)
+        private void AddDataPoint(float t, float h)
         {
             while (tempQueue.Count >= maxChartPoint) { tempQueue.Dequeue(); humiQueue.Dequeue(); if (timeQueue.Count > 0) timeQueue.Dequeue(); }
-            tempQueue.Enqueue(temp); humiQueue.Enqueue(humi); timeQueue.Enqueue(DateTime.Now);
-            if (temp < tempMin) tempMin = temp;
-            if (temp > tempMax) tempMax = temp;
-            if (humi < humiMin) humiMin = humi;
-            if (humi > humiMax) humiMax = humi;
-            tempSum += temp; humiSum += humi; dataCount++;
+            tempQueue.Enqueue(t); humiQueue.Enqueue(h); timeQueue.Enqueue(DateTime.Now);
+            if (t < tempMin) tempMin = t; if (t > tempMax) tempMax = t;
+            if (h < humiMin) humiMin = h; if (h > humiMax) humiMax = h;
+            tempSum += t; humiSum += h; dataCount++;
         }
 
-        private void updateUI(float temp, float humi)
+        private void updateUI(float t, float h)
         {
-            lblTempValue.Text = string.Format("{0:F1} ℃", temp);
-            lblHumiValue.Text = string.Format("{0:F1} %", humi);
+            lblTempValue.Text = string.Format("{0:F1} ℃", t);
+            lblHumiValue.Text = string.Format("{0:F1} %", h);
             lblUpdateTime.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             UpdateChart();
             if (dataCount > 0)
@@ -356,119 +612,100 @@ namespace TempHumidityMonitor
             }
         }
 
-        // ==================== Chart 更新 ====================
         private void UpdateChart()
         {
             chart1.Series["温度"].Points.Clear();
             chart1.Series["湿度"].Points.Clear();
-            float[] temps = tempQueue.ToArray();
-            float[] humis = humiQueue.ToArray();
-            for (int i = 0; i < temps.Length; i++)
+            float[] ts = tempQueue.ToArray(), hs = humiQueue.ToArray();
+            for (int i = 0; i < ts.Length; i++)
+            { chart1.Series["温度"].Points.AddXY(i + 1, ts[i]); chart1.Series["湿度"].Points.AddXY(i + 1, hs[i]); }
+            if (ts.Length > 0 && hs.Length > 0)
             {
-                chart1.Series["温度"].Points.AddXY(i + 1, temps[i]);
-                chart1.Series["湿度"].Points.AddXY(i + 1, humis[i]);
-            }
-            if (temps.Length > 0 && humis.Length > 0)
-            {
-                float minVal = Math.Min(temps.Min(), humis.Min()) - 5;
-                float maxVal = Math.Max(temps.Max(), humis.Max()) + 5;
-                chart1.ChartAreas["MainArea"].AxisY.Minimum = Math.Max(-50, minVal);
-                chart1.ChartAreas["MainArea"].AxisY.Maximum = Math.Min(150, maxVal);
+                float min = Math.Min(ts.Min(), hs.Min()) - 5, max = Math.Max(ts.Max(), hs.Max()) + 5;
+                chart1.ChartAreas["MainArea"].AxisY.Minimum = Math.Max(-50, min);
+                chart1.ChartAreas["MainArea"].AxisY.Maximum = Math.Min(150, max);
                 chart1.ChartAreas["MainArea"].RecalculateAxesScale();
             }
         }
 
         // ==================== 数据解析 ====================
-        private void getTempHumi(byte[] buffer, out float temp, out float humi)
+        private void getTempHumi(byte[] buf, out float t, out float h)
         {
-            temp = lastTemp; humi = lastHumi;
+            t = lastTemp; h = lastHumi;
             switch (cbReadMode.SelectedIndex)
             {
                 case 0:
-                    { byte[] a = new byte[4], b = new byte[4]; Array.Copy(buffer, 3, a, 0, 4); Array.Copy(buffer, 7, b, 0, 4); Array.Reverse(a); Array.Reverse(b); temp = BitConverter.ToSingle(a, 0); humi = BitConverter.ToSingle(b, 0); }
+                    { byte[] a = { buf[6], buf[5], buf[4], buf[3] }, b = { buf[10], buf[9], buf[8], buf[7] }; t = BitConverter.ToSingle(a, 0); h = BitConverter.ToSingle(b, 0); }
                     break;
                 case 1:
-                    { temp = ((buffer[3] << 8) | buffer[4]) / 10.0f; humi = ((buffer[5] << 8) | buffer[6]) / 10.0f; }
+                    { t = ((buf[3] << 8) | buf[4]) / 10.0f; h = ((buf[5] << 8) | buf[6]) / 10.0f; }
                     break;
                 case 2:
-                    { byte[] a = new byte[4]; Array.Copy(buffer, 3, a, 0, 4); Array.Reverse(a); temp = BitConverter.ToSingle(a, 0); }
+                    { byte[] a = { buf[6], buf[5], buf[4], buf[3] }; t = BitConverter.ToSingle(a, 0); }
                     break;
                 case 3:
-                    { byte[] b = new byte[4]; Array.Copy(buffer, 3, b, 0, 4); Array.Reverse(b); humi = BitConverter.ToSingle(b, 0); }
+                    { byte[] b = { buf[6], buf[5], buf[4], buf[3] }; h = BitConverter.ToSingle(b, 0); }
                     break;
                 case 4:
-                    { temp = ((buffer[3] << 8) | buffer[4]) / 10.0f; }
+                    { t = ((buf[3] << 8) | buf[4]) / 10.0f; }
                     break;
                 case 5:
-                    { humi = ((buffer[3] << 8) | buffer[4]) / 10.0f; }
+                    { h = ((buf[3] << 8) | buf[4]) / 10.0f; }
                     break;
             }
-            lastTemp = temp; lastHumi = humi;
+            lastTemp = t; lastHumi = h;
         }
 
-        // ==================== 数据校验 ====================
-        private bool checkData(byte[] buffer)
+        private bool checkData(byte[] buf)
         {
-            if (buffer == null || buffer.Length < 5) return false;
-            if (buffer[0] != 0x01 || buffer[1] != 0x03) return false;
-            int dataLen = buffer[2];
-            if (buffer.Length != dataLen + 5) return false;
-            if (!checkCRC(buffer)) return false;
-            return true;
+            if (buf == null || buf.Length < 5) return false;
+            if (buf[0] != 0x01 || buf[1] != 0x03) return false;
+            if (buf.Length != buf[2] + 5) return false;
+            return checkCRC(buf);
         }
 
-        private bool checkCRC(byte[] buffer)
+        private bool checkCRC(byte[] buf)
         {
-            if (buffer.Length < 2) return false;
-            byte[] data = new byte[buffer.Length - 2];
-            Array.Copy(buffer, data, data.Length);
-            byte[] crc = calc_CRC(data);
-            return crc[0] == buffer[buffer.Length - 2] && crc[1] == buffer[buffer.Length - 1];
+            if (buf.Length < 2) return false;
+            byte[] d = new byte[buf.Length - 2];
+            Array.Copy(buf, d, d.Length);
+            byte[] c = calcCRC(d);
+            return c[0] == buf[buf.Length - 2] && c[1] == buf[buf.Length - 1];
         }
 
-        private byte[] calc_CRC(byte[] ptbuf)
+        private byte[] calcCRC(byte[] p)
         {
-            uint crc16 = 0xffff;
-            uint temp, flag;
-            for (int i = 0; i < ptbuf.Length; i++)
+            uint crc = 0xffff;
+            for (int i = 0; i < p.Length; i++)
             {
-                temp = (uint)ptbuf[i] & 0x00ff;
-                crc16 = crc16 ^ temp;
-                for (uint c = 0; c < 8; c++)
+                crc ^= (uint)p[i] & 0x00ff;
+                for (int j = 0; j < 8; j++)
                 {
-                    flag = crc16 & 0x01;
-                    crc16 = crc16 >> 1;
-                    if (flag != 0) crc16 = crc16 ^ 0x0a001;
+                    uint flag = crc & 0x01;
+                    crc >>= 1;
+                    if (flag != 0) crc ^= 0x0a001;
                 }
             }
-            return BitConverter.GetBytes(crc16);
+            return BitConverter.GetBytes(crc);
         }
 
-        // ==================== 报警检查 ====================
-        private void CheckAlarm(float temp, float humi)
+        // ==================== 报警 ====================
+        private void CheckAlarm(float t, float h)
         {
             bool alarm = false;
-            System.Collections.Generic.List<string> alarms = new System.Collections.Generic.List<string>();
+            List<string> list = new List<string>();
             float tH = (float)nudTempHigh.Value, tL = (float)nudTempLow.Value;
             float hH = (float)nudHumiHigh.Value, hL = (float)nudHumiLow.Value;
-            if (temp > tH) { alarms.Add(string.Format("温度过高: {0:F1}℃ > {1:F1}℃", temp, tH)); alarm = true; }
-            if (temp < tL) { alarms.Add(string.Format("温度过低: {0:F1}℃ < {1:F1}℃", temp, tL)); alarm = true; }
-            if (humi > hH) { alarms.Add(string.Format("湿度过高: {0:F1}% > {1:F1}%", humi, hH)); alarm = true; }
-            if (humi < hL) { alarms.Add(string.Format("湿度过低: {0:F1}% < {1:F1}%", humi, hL)); alarm = true; }
+            if (t > tH) { list.Add(string.Format("温度过高:{0:F1}>{1:F1}", t, tH)); alarm = true; }
+            if (t < tL) { list.Add(string.Format("温度过低:{0:F1}<{1:F1}", t, tL)); alarm = true; }
+            if (h > hH) { list.Add(string.Format("湿度过高:{0:F1}>{1:F1}", h, hH)); alarm = true; }
+            if (h < hL) { list.Add(string.Format("湿度过低:{0:F1}<{1:F1}", h, hL)); alarm = true; }
             if (alarm)
             {
+                string msg = string.Join(";", list);
                 this.BeginInvoke(new Action(() =>
-                {
-                    lblStatus.Text = "⚠ 报警: " + string.Join("; ", alarms);
-                    lblStatus.ForeColor = Color.Red;
-                    lblTempValue.BackColor = (temp > tH || temp < tL) ? Color.LightPink : SystemColors.Control;
-                    lblHumiValue.BackColor = (humi > hH || humi < hL) ? Color.LightBlue : SystemColors.Control;
-                }));
-                LogAlarmToFile(string.Join(", ", alarms));
-            }
-            else
-            {
-                this.BeginInvoke(new Action(() => { lblTempValue.BackColor = SystemColors.Control; lblHumiValue.BackColor = SystemColors.Control; }));
+                { lblStatus.Text = "报警: " + msg; lblStatus.ForeColor = Color.Red; }));
+                LogAlarmToFile(msg);
             }
         }
 
@@ -477,45 +714,39 @@ namespace TempHumidityMonitor
         {
             try
             {
-                string dataDir = Path.Combine(Application.StartupPath, "DataLog");
-                if (!Directory.Exists(dataDir)) Directory.CreateDirectory(dataDir);
-                logFilePath = Path.Combine(dataDir, string.Format("sensor_data_{0:yyyyMMdd}.csv", DateTime.Now));
-                if (!File.Exists(logFilePath))
-                    File.WriteAllText(logFilePath, "时间,温度(℃),湿度(%),校验状态,备注\n", Encoding.UTF8);
+                string dir = Path.Combine(Application.StartupPath, "DataLog");
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                logFilePath = Path.Combine(dir, string.Format("data_{0:yyyyMMdd}.csv", DateTime.Now));
             }
-            catch (Exception ex) { LogError("初始化日志文件失败: " + ex.Message); }
+            catch (Exception ex) { LogError("初始化日志失败: " + ex.Message); }
         }
 
-        private void LogDataToFile(float temp, float humi)
+        private void LogDataToFile(float t, float h)
         {
             try
             {
-                string todayFile = Path.Combine(Path.GetDirectoryName(logFilePath), string.Format("sensor_data_{0:yyyyMMdd}.csv", DateTime.Now));
-                if (todayFile != logFilePath) { logFilePath = todayFile; if (!File.Exists(logFilePath)) File.WriteAllText(logFilePath, "时间,温度(℃),湿度(%),校验状态,备注\n", Encoding.UTF8); }
+                string dir = Path.GetDirectoryName(logFilePath);
+                string f = Path.Combine(dir, string.Format("data_{0:yyyyMMdd}.csv", DateTime.Now));
+                bool newFile = f != logFilePath;
+                logFilePath = f;
                 using (StreamWriter sw = new StreamWriter(logFilePath, true, Encoding.UTF8))
                 {
-                    string status = "正常", note = "";
-                    if (chkEnableAlarm.Checked)
-                    {
-                        float tH = (float)nudTempHigh.Value, tL = (float)nudTempLow.Value;
-                        float hH = (float)nudHumiHigh.Value, hL = (float)nudHumiLow.Value;
-                        if (temp > tH || temp < tL || humi > hH || humi < hL) { status = "报警"; note = string.Format("T:{0:F1}/H:{1:F1}", temp, humi); }
-                    }
-                    sw.WriteLine(string.Format("{0:yyyy-MM-dd HH:mm:ss},{1:F1},{2:F1},{3},{4}", DateTime.Now, temp, humi, status, note));
+                    if (newFile || new FileInfo(logFilePath).Length == 0)
+                        sw.WriteLine("时间,温度(℃),湿度(%)");
+                    sw.WriteLine(string.Format("{0:yyyy-MM-dd HH:mm:ss},{1:F1},{2:F1}", DateTime.Now, t, h));
                 }
             }
-            catch (Exception ex) { LogError("记录数据到文件失败: " + ex.Message); }
+            catch { }
         }
 
-        private void LogAlarmToFile(string alarmMsg)
+        private void LogAlarmToFile(string msg)
         {
             try
             {
-                string alarmDir = Path.Combine(Application.StartupPath, "DataLog");
-                if (!Directory.Exists(alarmDir)) Directory.CreateDirectory(alarmDir);
-                string alarmFile = Path.Combine(alarmDir, string.Format("alarm_{0:yyyyMMdd}.log", DateTime.Now));
-                using (StreamWriter sw = new StreamWriter(alarmFile, true, Encoding.UTF8))
-                    sw.WriteLine("[{0:yyyy-MM-dd HH:mm:ss}] {1}", DateTime.Now, alarmMsg);
+                string dir = Path.Combine(Application.StartupPath, "DataLog");
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                File.AppendAllText(Path.Combine(dir, string.Format("alarm_{0:yyyyMMdd}.log", DateTime.Now)),
+                    string.Format("[{0:HH:mm:ss}] {1}\n", DateTime.Now, msg), Encoding.UTF8);
             }
             catch { }
         }
@@ -524,11 +755,10 @@ namespace TempHumidityMonitor
         {
             try
             {
-                string errDir = Path.Combine(Application.StartupPath, "DataLog");
-                if (!Directory.Exists(errDir)) Directory.CreateDirectory(errDir);
-                string errFile = Path.Combine(errDir, string.Format("error_{0:yyyyMMdd}.log", DateTime.Now));
-                using (StreamWriter sw = new StreamWriter(errFile, true, Encoding.UTF8))
-                    sw.WriteLine("[{0:yyyy-MM-dd HH:mm:ss}] {1}", DateTime.Now, msg);
+                string dir = Path.Combine(Application.StartupPath, "DataLog");
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                File.AppendAllText(Path.Combine(dir, string.Format("error_{0:yyyyMMdd}.log", DateTime.Now)),
+                    string.Format("[{0:HH:mm:ss}] {1}\n", DateTime.Now, msg), Encoding.UTF8);
             }
             catch { }
         }
@@ -540,25 +770,23 @@ namespace TempHumidityMonitor
             {
                 using (SaveFileDialog sfd = new SaveFileDialog())
                 {
-                    sfd.Filter = "CSV文件 (*.csv)|*.csv"; sfd.DefaultExt = "csv";
-                    sfd.FileName = string.Format("温湿度数据导出_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now);
+                    sfd.Filter = "CSV文件 (*.csv)|*.csv"; sfd.FileName = string.Format("温湿度_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now);
                     if (sfd.ShowDialog() == DialogResult.OK)
                     {
                         using (StreamWriter sw = new StreamWriter(sfd.FileName, false, Encoding.UTF8))
                         {
                             sw.WriteLine("序号,温度(℃),湿度(%)");
-                            float[] temps = tempQueue.ToArray(), humis = humiQueue.ToArray();
-                            for (int i = 0; i < temps.Length; i++)
-                                sw.WriteLine(string.Format("{0},{1:F1},{2:F1}", i + 1, temps[i], humis[i]));
+                            float[] ts = tempQueue.ToArray(), hs = humiQueue.ToArray();
+                            for (int i = 0; i < ts.Length; i++) sw.WriteLine("{0},{1:F1},{2:F1}", i + 1, ts[i], hs[i]);
                         }
-                        ShowTip(string.Format("已导出 {0} 条记录到:\n{1}", tempQueue.Count, sfd.FileName));
+                        ShowTip(string.Format("已导出{0}条记录", tempQueue.Count));
                     }
                 }
             }
             catch (Exception ex) { ShowTip("导出失败: " + ex.Message); }
         }
 
-        // ==================== 清除数据 ====================
+        // ==================== 清除 ====================
         private void btnClearChart_Click(object sender, EventArgs e) { ClearAllData(); }
         private void btnClearStats_Click(object sender, EventArgs e) { ClearStats(); }
 
@@ -579,18 +807,28 @@ namespace TempHumidityMonitor
             lblHumiMin.Text = "最小:--"; lblHumiMax.Text = "最大:--"; lblHumiAvg.Text = "平均:--";
         }
 
-        // ==================== 设置变更响应 ====================
-        private void cbReadMode_SelectedIndexChanged(object sender, EventArgs e) { Settings.Default.ReadMode = cbReadMode.SelectedIndex; Settings.Default.Save(); }
-        private void nudInterval_ValueChanged(object sender, EventArgs e) { Settings.Default.SampleInterval = (int)nudInterval.Value; Settings.Default.Save(); if (timer1 != null && isComOpen) timer1.Interval = (int)nudInterval.Value; }
-        private void nudMaxPoints_ValueChanged(object sender, EventArgs e) { maxChartPoint = (int)nudMaxPoints.Value; Settings.Default.MaxChartPoints = maxChartPoint; Settings.Default.Save(); while (tempQueue.Count > maxChartPoint) { tempQueue.Dequeue(); humiQueue.Dequeue(); if (timeQueue.Count > 0) timeQueue.Dequeue(); } }
-        private void chkEnableAlarm_CheckedChanged(object sender, EventArgs e) { Settings.Default.EnableAlarm = chkEnableAlarm.Checked; Settings.Default.Save(); }
-        private void chkDataLog_CheckedChanged(object sender, EventArgs e) { Settings.Default.EnableDataLog = chkDataLog.Checked; Settings.Default.Save(); }
+        // ==================== 设置变更 ====================
+        private void cbReadMode_SelectedIndexChanged(object sender, EventArgs e)
+        { Settings.Default.ReadMode = cbReadMode.SelectedIndex; Settings.Default.Save(); }
+
+        private void nudInterval_ValueChanged(object sender, EventArgs e)
+        { Settings.Default.SampleInterval = (int)nudInterval.Value; Settings.Default.Save(); if (timer1 != null && isComOpen) timer1.Interval = (int)nudInterval.Value; }
+
+        private void nudMaxPoints_ValueChanged(object sender, EventArgs e)
+        {
+            maxChartPoint = (int)nudMaxPoints.Value; Settings.Default.MaxChartPoints = maxChartPoint; Settings.Default.Save();
+            while (tempQueue.Count > maxChartPoint) { tempQueue.Dequeue(); humiQueue.Dequeue(); if (timeQueue.Count > 0) timeQueue.Dequeue(); }
+        }
+
+        private void chkEnableAlarm_CheckedChanged(object sender, EventArgs e)
+        { Settings.Default.EnableAlarm = chkEnableAlarm.Checked; Settings.Default.Save(); }
+
+        private void chkDataLog_CheckedChanged(object sender, EventArgs e)
+        { Settings.Default.EnableDataLog = chkDataLog.Checked; Settings.Default.Save(); }
 
         // ==================== 设置持久化 ====================
         private void LoadSettings()
-        {
-            try { Settings.Default.Upgrade(); Settings.Default.Reload(); } catch { }
-        }
+        { try { Settings.Default.Upgrade(); Settings.Default.Reload(); } catch { } }
 
         private void SaveAllSettings()
         {
@@ -608,25 +846,20 @@ namespace TempHumidityMonitor
                 Settings.Default.EnableDataLog = chkDataLog.Checked;
                 Settings.Default.Save();
             }
-            catch (Exception ex) { LogError("保存设置失败: " + ex.Message); }
+            catch { }
         }
 
-        // ==================== 窗体关闭 ====================
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            SaveAllSettings();
-            if (isComOpen) closeComPort();
-        }
+        { SaveAllSettings(); if (isComOpen) closeComPort(); }
 
-        // ==================== 辅助方法 ====================
+        // ==================== 辅助 ====================
         private void ShowTip(string msg) { MessageBox.Show(msg, "提示", MessageBoxButtons.OK, MessageBoxIcon.Information); }
 
         private void UpdateStatus()
         {
             if (this.InvokeRequired)
                 this.BeginInvoke(new Action(() => { tsslError.Text = "错误: " + nError; tsslSend.Text = "发送: " + nSend; tsslRecv.Text = "接收: " + nReceive; }));
-            else
-            { tsslError.Text = "错误: " + nError; tsslSend.Text = "发送: " + nSend; tsslRecv.Text = "接收: " + nReceive; }
+            else { tsslError.Text = "错误: " + nError; tsslSend.Text = "发送: " + nSend; tsslRecv.Text = "接收: " + nReceive; }
         }
     }
 }
