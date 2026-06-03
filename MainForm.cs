@@ -39,325 +39,28 @@ namespace TempHumidityMonitor
             tempQueue = new Queue<float>();
             humiQueue = new Queue<float>();
             timeQueue = new Queue<DateTime>();
-
-            // 设计器安全的最小初始化
             InitializeComponent();
-
-            // 运行时：构建完整UI + 初始化
-            if (!IsDesignMode())
-            {
-                BuildFullUI();
-                WireUpEvents();
-                InitAfterDesign();
-            }
+            AddHeaderLabels();
+            InitAfterDesign();
         }
 
-        private bool IsDesignMode()
+        private void AddHeaderLabels()
         {
-            if (System.ComponentModel.LicenseManager.UsageMode == System.ComponentModel.LicenseUsageMode.Designtime)
-                return true;
-            if (System.Diagnostics.Process.GetCurrentProcess().ProcessName == "devenv")
-                return true;
-            return DesignMode;
-        }
+            Font labelFont = new Font("微软雅黑", 9F);
+            // 串口设置面板标签
+            gbSerial.Controls.Add(new Label() { Text = "串口号:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight, Location = new Point(8, 27), Size = new Size(55, 23) });
+            gbSerial.Controls.Add(new Label() { Text = "波特率:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight, Location = new Point(8, 59), Size = new Size(55, 23) });
 
-        // ==================== 完整UI构建（仅运行时） ====================
-        private void BuildFullUI()
-        {
-            // 创建顶层容器（Designer.cs中只声明未实例化）
-            splitContainer1 = new SplitContainer();
-            splitContainer1.Dock = DockStyle.Fill;
-            splitContainer1.FixedPanel = FixedPanel.Panel1;
+            // 采集设置TLP标签
+            tlpCollect.Controls.Add(new Label() { Text = "读取模式:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 0);
+            tlpCollect.Controls.Add(new Label() { Text = "间隔(ms):", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 1);
+            tlpCollect.Controls.Add(new Label() { Text = "最大点数:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 2);
 
-            statusStrip1 = new StatusStrip();
-            statusStrip1.Dock = DockStyle.Bottom;
-            tsslStatus = new ToolStripStatusLabel("● 串口未打开") { ForeColor = System.Drawing.Color.Gray, Width = 140 };
-            tsslSend = new ToolStripStatusLabel("发送: 0");
-            tsslRecv = new ToolStripStatusLabel("接收: 0");
-            tsslError = new ToolStripStatusLabel("错误: 0") { ForeColor = System.Drawing.Color.Orange };
-            tsslTime = new ToolStripStatusLabel("00:00:00");
-            statusStrip1.Items.AddRange(new ToolStripItem[] { tsslStatus, tsslSend, tsslRecv, tsslError, new ToolStripStatusLabel("  "), tsslTime });
-
-            this.SuspendLayout();
-            splitContainer1.SuspendLayout();
-
-            // Chart（右侧Panel2）
-            chart1 = new Chart();
-            chart1.Dock = DockStyle.Fill;
-            {
-                ChartArea area = new ChartArea("MainArea");
-                area.AxisX.Title = "采样点序号";
-                area.AxisX.TitleFont = new Font("Microsoft YaHei", 9);
-                area.AxisX.MajorGrid.LineColor = Color.LightGray;
-                area.AxisY.Title = "数值";
-                area.AxisY.TitleFont = new Font("Microsoft YaHei", 9);
-                area.AxisY.MajorGrid.LineColor = Color.LightGray;
-                area.AxisY.Minimum = -10; area.AxisY.Maximum = 100; area.AxisY.Interval = 10;
-                area.CursorX.IsUserEnabled = true; area.CursorX.IsUserSelectionEnabled = true;
-                area.AxisX.ScrollBar.Enabled = true; area.AxisX.ScaleView.Zoomable = true;
-                chart1.ChartAreas.Add(area);
-
-                Legend legend = new Legend("Legend") { Docking = Docking.Top, Font = new Font("Microsoft YaHei", 9) };
-                chart1.Legends.Add(legend);
-
-                Series t = new Series("温度")
-                {
-                    ChartType = SeriesChartType.Spline, Color = Color.Red, BorderWidth = 2,
-                    MarkerStyle = MarkerStyle.Circle, MarkerSize = 6, MarkerColor = Color.Red, LegendText = "温度 (℃)"
-                };
-                chart1.Series.Add(t);
-
-                Series h = new Series("湿度")
-                {
-                    ChartType = SeriesChartType.Spline, Color = Color.Blue, BorderWidth = 2,
-                    MarkerStyle = MarkerStyle.Diamond, MarkerSize = 6, MarkerColor = Color.Blue, LegendText = "湿度 (%)"
-                };
-                chart1.Series.Add(h);
-            }
-            splitContainer1.Panel2.Controls.Add(chart1);
-
-            // 左侧Panel1
-            Panel pnlLeft = splitContainer1.Panel1;
-            pnlLeft.Padding = new Padding(4);
-            int top = 4;
-            int gbWidth = 283;  // 统一GroupBox宽度
-            int pad = 4;        // 面板间距
-
-            // 模拟模式 CheckBox
-            chkSimMode = new CheckBox();
-            chkSimMode.Text = "模拟模式（无需硬件演示）";
-            chkSimMode.Location = new Point(4, top);
-            chkSimMode.Size = new Size(gbWidth, 20);
-            pnlLeft.Controls.Add(chkSimMode);
-            top += 22;
-
-            // 串口设置
-            gbSerial = new GroupBox();
-            gbSerial.Text = "串口设置";
-            gbSerial.Location = new Point(4, top);
-            gbSerial.Size = new Size(gbWidth, 122);
-            {
-                // 绝对定位替代TLP，消除边框裁剪问题
-                int lx = 60; // 标签列宽
-                int ly = 20; // 起始Y（GroupBox标题下方）
-                int lh = 24; // 行高
-                Label lblPort = new Label() { Text = "串口号:", TextAlign = ContentAlignment.MiddleRight, Location = new Point(4, ly), Size = new Size(52, lh) };
-                gbSerial.Controls.Add(lblPort);
-                cbComPort = new ComboBox() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 165, Location = new Point(lx, ly) };
-                gbSerial.Controls.Add(cbComPort);
-                btnRefreshPorts = new Button() { Text = "刷新", Size = new Size(52, lh), Location = new Point(lx + 170, ly) };
-                gbSerial.Controls.Add(btnRefreshPorts);
-
-                ly += 30;
-                Label lblBaud = new Label() { Text = "波特率:", TextAlign = ContentAlignment.MiddleRight, Location = new Point(4, ly), Size = new Size(52, lh) };
-                gbSerial.Controls.Add(lblBaud);
-                cbBaudRate = new ComboBox() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220, Location = new Point(lx, ly) };
-                cbBaudRate.Items.AddRange(new object[] { "4800", "9600", "19200", "38400", "57600", "115200" });
-                cbBaudRate.SelectedIndex = 1;
-                gbSerial.Controls.Add(cbBaudRate);
-
-                ly += 30;
-                btnOpenCloseCom = new Button() { Text = "打开串口", Size = new Size(110, lh + 2), Location = new Point(28, ly) };
-                gbSerial.Controls.Add(btnOpenCloseCom);
-                btnManualSend = new Button() { Text = "手动采集", Size = new Size(110, lh + 2), Location = new Point(144, ly) };
-                gbSerial.Controls.Add(btnManualSend);
-            }
-            pnlLeft.Controls.Add(gbSerial);
-            top += 122 + pad;
-
-            // 采集设置
-            gbCollect = new GroupBox();
-            gbCollect.Text = "采集设置";
-            gbCollect.Location = new Point(4, top);
-            gbCollect.Size = new Size(gbWidth, 100);
-            {
-                TableLayoutPanel tlp = TLP(2, 3, 28, 70);
-                gbCollect.Controls.Add(tlp);
-
-                tlp.Controls.Add(Lbl("读取模式:"), 0, 0);
-                cbReadMode = new ComboBox() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
-                cbReadMode.Items.AddRange(new object[] { "一次读取（浮点格式）", "一次读取（整型格式）", "单独读取温度（浮点）", "单独读取湿度（浮点）", "单独读取温度（整型）", "单独读取湿度（整型）" });
-                cbReadMode.SelectedIndex = 0;
-                tlp.Controls.Add(cbReadMode, 1, 0);
-
-                tlp.Controls.Add(Lbl("间隔(ms):"), 0, 1);
-                nudInterval = new NumericUpDown() { Minimum = 200, Maximum = 60000, Increment = 100, Value = 1000, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
-                tlp.Controls.Add(nudInterval, 1, 1);
-
-                tlp.Controls.Add(Lbl("最大点数:"), 0, 2);
-                nudMaxPoints = new NumericUpDown() { Minimum = 10, Maximum = 500, Increment = 10, Value = 30, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
-                tlp.Controls.Add(nudMaxPoints, 1, 2);
-            }
-            pnlLeft.Controls.Add(gbCollect);
-            top += 100 + pad;
-
-            // 当前数据
-            gbCurrent = new GroupBox();
-            gbCurrent.Text = "当前数据";
-            gbCurrent.Location = new Point(4, top);
-            gbCurrent.Size = new Size(gbWidth, 100);
-            {
-                TableLayoutPanel tlp = TLP(2, 3, 26, 50);
-                gbCurrent.Controls.Add(tlp);
-
-                tlp.Controls.Add(Lbl("温度:"), 0, 0);
-                lblTempValue = new Label() { Text = "--.- ℃", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Microsoft YaHei", 11F, FontStyle.Bold), ForeColor = Color.Red };
-                tlp.Controls.Add(lblTempValue, 1, 0);
-
-                tlp.Controls.Add(Lbl("湿度:"), 0, 1);
-                lblHumiValue = new Label() { Text = "--.- %", TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Microsoft YaHei", 11F, FontStyle.Bold), ForeColor = Color.Blue };
-                tlp.Controls.Add(lblHumiValue, 1, 1);
-
-                tlp.Controls.Add(Lbl("更新:"), 0, 2);
-                lblUpdateTime = new Label() { Text = "--", TextAlign = ContentAlignment.MiddleCenter };
-                tlp.Controls.Add(lblUpdateTime, 1, 2);
-            }
-            pnlLeft.Controls.Add(gbCurrent);
-            top += 100 + pad;
-
-            // 统计信息
-            gbStats = new GroupBox();
-            gbStats.Text = "统计信息";
-            gbStats.Location = new Point(4, top);
-            gbStats.Size = new Size(gbWidth, 105);
-            {
-                TableLayoutPanel tlp = TLP(4, 3, 24, 42);
-                gbStats.Controls.Add(tlp);
-
-                tlp.Controls.Add(Lbl("温度:"), 0, 0);
-                lblTempMin = new Label() { Text = "最小:--", ForeColor = Color.DarkRed, TextAlign = ContentAlignment.MiddleCenter };
-                lblTempMax = new Label() { Text = "最大:--", ForeColor = Color.DarkRed, TextAlign = ContentAlignment.MiddleCenter };
-                lblTempAvg = new Label() { Text = "平均:--", ForeColor = Color.DarkRed, TextAlign = ContentAlignment.MiddleCenter };
-                tlp.Controls.Add(lblTempMin, 1, 0); tlp.Controls.Add(lblTempMax, 2, 0); tlp.Controls.Add(lblTempAvg, 3, 0);
-
-                tlp.Controls.Add(Lbl("湿度:"), 0, 1);
-                lblHumiMin = new Label() { Text = "最小:--", ForeColor = Color.DarkBlue, TextAlign = ContentAlignment.MiddleCenter };
-                lblHumiMax = new Label() { Text = "最大:--", ForeColor = Color.DarkBlue, TextAlign = ContentAlignment.MiddleCenter };
-                lblHumiAvg = new Label() { Text = "平均:--", ForeColor = Color.DarkBlue, TextAlign = ContentAlignment.MiddleCenter };
-                tlp.Controls.Add(lblHumiMin, 1, 1); tlp.Controls.Add(lblHumiMax, 2, 1); tlp.Controls.Add(lblHumiAvg, 3, 1);
-
-                btnClearStats = new Button() { Text = "重置统计", Size = new Size(70, 22) };
-                tlp.Controls.Add(btnClearStats, 0, 2);
-                tlp.SetColumnSpan(btnClearStats, 4);
-            }
-            pnlLeft.Controls.Add(gbStats);
-            top += 105 + pad;
-
-            // 报警设置
-            gbAlarm = new GroupBox();
-            gbAlarm.Text = "报警设置";
-            gbAlarm.Location = new Point(4, top);
-            gbAlarm.Size = new Size(gbWidth, 158);
-            {
-                TableLayoutPanel tlp = TLP(2, 5, 24, 70);
-                gbAlarm.Controls.Add(tlp);
-
-                chkEnableAlarm = new CheckBox() { Text = "启用报警", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
-                tlp.Controls.Add(chkEnableAlarm, 1, 0);
-
-                tlp.Controls.Add(Lbl("温度上限:"), 0, 1);
-                nudTempHigh = new NumericUpDown() { Minimum = -50, Maximum = 150, Increment = 0.5M, Value = 40, DecimalPlaces = 1, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
-                tlp.Controls.Add(nudTempHigh, 1, 1);
-
-                tlp.Controls.Add(Lbl("温度下限:"), 0, 2);
-                nudTempLow = new NumericUpDown() { Minimum = -50, Maximum = 150, Increment = 0.5M, Value = 0, DecimalPlaces = 1, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
-                tlp.Controls.Add(nudTempLow, 1, 2);
-
-                tlp.Controls.Add(Lbl("湿度上限:"), 0, 3);
-                nudHumiHigh = new NumericUpDown() { Minimum = 0, Maximum = 100, Increment = 1, Value = 80, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
-                tlp.Controls.Add(nudHumiHigh, 1, 3);
-
-                tlp.Controls.Add(Lbl("湿度下限:"), 0, 4);
-                nudHumiLow = new NumericUpDown() { Minimum = 0, Maximum = 100, Increment = 1, Value = 20, TextAlign = HorizontalAlignment.Center, Dock = DockStyle.Fill };
-                tlp.Controls.Add(nudHumiLow, 1, 4);
-            }
-            pnlLeft.Controls.Add(gbAlarm);
-            top += 158 + pad;
-
-            // 数据管理
-            gbData = new GroupBox();
-            gbData.Text = "数据管理";
-            gbData.Location = new Point(4, top);
-            gbData.Size = new Size(gbWidth, 105);
-            {
-                chkDataLog = new CheckBox() { Text = "启用数据记录", Checked = true, TextAlign = ContentAlignment.MiddleLeft };
-                btnExportCSV = new Button() { Text = "导出CSV", TextAlign = ContentAlignment.MiddleCenter };
-                btnClearChart = new Button() { Text = "清除图表", TextAlign = ContentAlignment.MiddleCenter };
-
-                TableLayoutPanel tlp = TLP(1, 3, 28, 0);
-                gbData.Controls.Add(tlp);
-                tlp.Controls.Add(chkDataLog, 0, 0); chkDataLog.Dock = DockStyle.Fill;
-                tlp.Controls.Add(btnExportCSV, 0, 1); btnExportCSV.Dock = DockStyle.Fill;
-                tlp.Controls.Add(btnClearChart, 0, 2); btnClearChart.Dock = DockStyle.Fill;
-            }
-            pnlLeft.Controls.Add(gbData);
-            top += 105 + pad;
-
-            // 状态Label
-            lblStatus = new Label();
-            lblStatus.Text = "就绪"; lblStatus.ForeColor = Color.Gray;
-            lblStatus.Location = new Point(4, top); lblStatus.Size = new Size(270, 18);
-            pnlLeft.Controls.Add(lblStatus);
-
-            // 组件
-            timer1 = new Timer();
-            serialPort1 = new SerialPort();
-
-            // 添加到窗体
-            this.Controls.Add(splitContainer1);
-            this.Controls.Add(statusStrip1);
-
-            splitContainer1.ResumeLayout(false);
-            this.ResumeLayout(false);
-        }
-
-        // 辅助：快速创建 Label
-        private static Label Lbl(string text)
-        {
-            return new Label() { Text = text, TextAlign = ContentAlignment.MiddleRight };
-        }
-
-        // 辅助：快速创建 TableLayoutPanel
-        private static TableLayoutPanel TLP(int cols, int rows, int rowH, int col0w)
-        {
-            TableLayoutPanel tlp = new TableLayoutPanel();
-            tlp.Dock = DockStyle.Fill;
-            tlp.ColumnCount = cols;
-            tlp.RowCount = rows;
-            tlp.Padding = new Padding(4, 0, 4, 0);
-            if (col0w > 0)
-            {
-                tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, col0w));
-                for (int i = 1; i < cols; i++)
-                    tlp.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100 / (cols - 1)));
-            }
-            for (int i = 0; i < rows; i++)
-                tlp.RowStyles.Add(new RowStyle(SizeType.Absolute, rowH));
-            return tlp;
-        }
-
-        // ==================== 事件绑定 ====================
-        private void WireUpEvents()
-        {
-            this.Load += MainForm_Load;
-            this.Shown += MainForm_Shown;
-            this.FormClosing += MainForm_FormClosing;
-
-            chkSimMode.CheckedChanged += chkSimMode_CheckedChanged;
-            btnRefreshPorts.Click += btnRefreshPorts_Click;
-            btnOpenCloseCom.Click += btnOpenCloseCom_Click;
-            btnManualSend.Click += btnManualSend_Click;
-            btnClearStats.Click += btnClearStats_Click;
-            btnExportCSV.Click += btnExportCSV_Click;
-            btnClearChart.Click += btnClearChart_Click;
-            chkEnableAlarm.CheckedChanged += chkEnableAlarm_CheckedChanged;
-            chkDataLog.CheckedChanged += chkDataLog_CheckedChanged;
-            cbReadMode.SelectedIndexChanged += cbReadMode_SelectedIndexChanged;
-            nudInterval.ValueChanged += nudInterval_ValueChanged;
-            nudMaxPoints.ValueChanged += nudMaxPoints_ValueChanged;
-            timer1.Tick += timer1_Tick;
-            serialPort1.DataReceived += serialPort1_DataReceived;
-            serialPort1.ErrorReceived += serialPort1_ErrorReceived;
+            // 报警设置TLP标签
+            tlpAlarm.Controls.Add(new Label() { Text = "温度上限:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 1);
+            tlpAlarm.Controls.Add(new Label() { Text = "温度下限:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 2);
+            tlpAlarm.Controls.Add(new Label() { Text = "湿度上限:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 3);
+            tlpAlarm.Controls.Add(new Label() { Text = "湿度下限:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 4);
         }
 
         private void InitAfterDesign()
@@ -372,9 +75,6 @@ namespace TempHumidityMonitor
 
         private void MainForm_Shown(object sender, EventArgs e)
         {
-            splitContainer1.SplitterDistance = 300;
-            splitContainer1.Panel1MinSize = 260;
-            splitContainer1.Panel2MinSize = 200;
         }
 
         // ==================== 初始化控件状态 ====================
@@ -444,6 +144,9 @@ namespace TempHumidityMonitor
                 isComOpen = true;
                 btnOpenCloseCom.Text = "关闭串口"; btnOpenCloseCom.BackColor = Color.LightCoral;
                 tsslStatus.Text = "● 串口已打开 - " + portName; tsslStatus.ForeColor = Color.Green;
+                lblDeviceStatus.Text = "● 串口已连接     ● 正在采集     ● 数据正常";
+                lblDeviceStatus.ForeColor = Color.FromArgb(31, 41, 55);
+                lblCardStatusValue.Text = "在线"; lblCardStatusValue.ForeColor = Color.FromArgb(82, 196, 26);
                 timer1.Interval = (int)nudInterval.Value; timer1.Start();
                 cbComPort.Enabled = false; btnRefreshPorts.Enabled = false; cbBaudRate.Enabled = false;
                 lblStatus.Text = "串口已打开，正在采集数据..."; lblStatus.ForeColor = Color.Green;
@@ -459,6 +162,9 @@ namespace TempHumidityMonitor
                 timer1.Stop(); if (serialPort1.IsOpen) serialPort1.Close();
                 isComOpen = false; btnOpenCloseCom.Text = "打开串口"; btnOpenCloseCom.BackColor = SystemColors.Control;
                 tsslStatus.Text = "● 串口已关闭"; tsslStatus.ForeColor = Color.Gray;
+                lblDeviceStatus.Text = "○ 串口未打开     ○ 等待采集     ○ 数据就绪";
+                lblDeviceStatus.ForeColor = Color.FromArgb(31, 41, 55);
+                lblCardStatusValue.Text = "离线"; lblCardStatusValue.ForeColor = Color.FromArgb(156, 163, 175);
                 cbComPort.Enabled = true; btnRefreshPorts.Enabled = true; cbBaudRate.Enabled = true;
                 lblStatus.Text = "串口已关闭"; lblStatus.ForeColor = Color.Gray;
             }
@@ -602,19 +308,34 @@ namespace TempHumidityMonitor
 
         private void updateUI(float t, float h)
         {
-            lblTempValue.Text = string.Format("{0:F1} ℃", t);
-            lblHumiValue.Text = string.Format("{0:F1} %", h);
+            // 卡片数据
+            lblCardTempValue.Text = string.Format("{0:F1}℃", t);
+            lblCardHumiValue.Text = string.Format("{0:F1}%", h);
             lblUpdateTime.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            lblClockTop.Text = DateTime.Now.ToString("HH:mm:ss");
             UpdateChart();
+            // 统计标签和卡片范围
             if (dataCount > 0)
             {
-                lblTempMin.Text = string.Format("最小: {0:F1}", tempMin);
-                lblTempMax.Text = string.Format("最大: {0:F1}", tempMax);
-                lblTempAvg.Text = string.Format("平均: {0:F1}", tempSum / dataCount);
-                lblHumiMin.Text = string.Format("最小: {0:F1}", humiMin);
-                lblHumiMax.Text = string.Format("最大: {0:F1}", humiMax);
-                lblHumiAvg.Text = string.Format("平均: {0:F1}", humiSum / dataCount);
+                lblCardTempRange.Text = string.Format("↑{0:F1}  ↓{1:F1}", tempMax, tempMin);
+                lblCardHumiRange.Text = string.Format("↑{0:F1}  ↓{1:F1}", humiMax, humiMin);
+                lblTempMin.Text = string.Format("最低:{0:F1}", tempMin);
+                lblTempMax.Text = string.Format("最高:{0:F1}", tempMax);
+                lblTempAvg.Text = string.Format("平均:{0:F1}", tempSum / dataCount);
+                lblHumiMin.Text = string.Format("最低:{0:F1}", humiMin);
+                lblHumiMax.Text = string.Format("最高:{0:F1}", humiMax);
+                lblHumiAvg.Text = string.Format("平均:{0:F1}", humiSum / dataCount);
             }
+            // DataGridView 添加行
+            string status = "正常";
+            if (chkEnableAlarm.Checked)
+            {
+                float tH = (float)nudTempHigh.Value, tL = (float)nudTempLow.Value;
+                float hH = (float)nudHumiHigh.Value, hL = (float)nudHumiLow.Value;
+                if (t > tH || t < tL || h > hH || h < hL) status = "报警";
+            }
+            dgvData.Rows.Insert(0, DateTime.Now.ToString("HH:mm:ss"), string.Format("{0:F1}", t), string.Format("{0:F1}", h), status);
+            while (dgvData.Rows.Count > 100) dgvData.Rows.RemoveAt(dgvData.Rows.Count - 1);
         }
 
         private void UpdateChart()
@@ -709,8 +430,18 @@ namespace TempHumidityMonitor
             {
                 string msg = string.Join(";", list);
                 this.BeginInvoke(new Action(() =>
-                { lblStatus.Text = "报警: " + msg; lblStatus.ForeColor = Color.Red; }));
+                {
+                    lblStatus.Text = "报警: " + msg; lblStatus.ForeColor = Color.Red;
+                    lblCardAlarmValue.Text = "报警"; lblCardAlarmValue.ForeColor = Color.FromArgb(255, 77, 79);
+                }));
                 LogAlarmToFile(msg);
+            }
+            else
+            {
+                this.BeginInvoke(new Action(() =>
+                {
+                    lblCardAlarmValue.Text = "正常"; lblCardAlarmValue.ForeColor = Color.FromArgb(82, 196, 26);
+                }));
             }
         }
 
@@ -790,10 +521,9 @@ namespace TempHumidityMonitor
                         cmd.ExecuteNonQuery();
                 }
             }
-            catch { /* 数据库初始化失败不影响主流程 */ }
+            catch { }
         }
 
-        private void SaveToDatabase(float temp, float humi, bool isSim)
         private void SaveToDatabase(float temp, float humi, bool isSim)
         {
             try
@@ -826,7 +556,7 @@ namespace TempHumidityMonitor
                     }
                 }
             }
-            catch { /* 数据库写入失败不影响主流程 */ }
+            catch { }
         }
 
         // ==================== 导出CSV ====================
@@ -860,7 +590,8 @@ namespace TempHumidityMonitor
         {
             tempQueue.Clear(); humiQueue.Clear(); timeQueue.Clear(); ClearStats();
             chart1.Series["温度"].Points.Clear(); chart1.Series["湿度"].Points.Clear();
-            lblTempValue.Text = "--.- ℃"; lblHumiValue.Text = "--.- %"; lblUpdateTime.Text = "--";
+            dgvData.Rows.Clear();
+            lblCardTempValue.Text = "--.-℃"; lblCardHumiValue.Text = "--.-%";
         }
 
         private void ClearStats()
@@ -869,8 +600,8 @@ namespace TempHumidityMonitor
             tempMin = float.MaxValue; tempMax = float.MinValue;
             humiMin = float.MaxValue; humiMax = float.MinValue;
             tempSum = 0; humiSum = 0;
-            lblTempMin.Text = "最小:--"; lblTempMax.Text = "最大:--"; lblTempAvg.Text = "平均:--";
-            lblHumiMin.Text = "最小:--"; lblHumiMax.Text = "最大:--"; lblHumiAvg.Text = "平均:--";
+            lblTempMin.Text = "最低:--"; lblTempMax.Text = "最高:--"; lblTempAvg.Text = "平均:--";
+            lblHumiMin.Text = "最低:--"; lblHumiMax.Text = "最高:--"; lblHumiAvg.Text = "平均:--";
         }
 
         // ==================== 设置变更 ====================
