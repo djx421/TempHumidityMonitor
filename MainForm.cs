@@ -25,7 +25,7 @@ namespace TempHumidityMonitor
         private int dataCount = 0;
         private List<byte> receiveBuffer = new List<byte>();
         private string logFilePath;
-        private string dbConnStr = @"Data Source=F:\set\TempHumidityData.db;Version=3;";
+        private string GetDbPath() { return Path.Combine(Application.StartupPath, "TempHumidityData.db"); }
         private bool isComOpen = false;
         private bool isSimMode = false;
         private DateTime lastReceiveTime = DateTime.MinValue;
@@ -401,6 +401,7 @@ namespace TempHumidityMonitor
             catch { }
 
             InitLogFile();
+            InitDatabase();
 
             Timer timeTimer = new Timer { Interval = 1000 };
             timeTimer.Tick += (s, ev) => { tsslTime.Text = DateTime.Now.ToString("HH:mm:ss"); };
@@ -768,6 +769,31 @@ namespace TempHumidityMonitor
         }
 
         // ==================== 数据库存储 ====================
+        private void InitDatabase()
+        {
+            try
+            {
+                string dbPath = GetDbPath();
+                using (var conn = new SQLiteConnection("Data Source=" + dbPath + ";Version=3;"))
+                {
+                    conn.Open();
+                    string sql = @"CREATE TABLE IF NOT EXISTS sensor_data (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp TEXT NOT NULL,
+                        temperature REAL,
+                        humidity REAL,
+                        read_mode TEXT,
+                        is_simulated INTEGER DEFAULT 0,
+                        is_alarm INTEGER DEFAULT 0,
+                        alarm_msg TEXT);";
+                    using (var cmd = new SQLiteCommand(sql, conn))
+                        cmd.ExecuteNonQuery();
+                }
+            }
+            catch { /* 数据库初始化失败不影响主流程 */ }
+        }
+
+        private void SaveToDatabase(float temp, float humi, bool isSim)
         private void SaveToDatabase(float temp, float humi, bool isSim)
         {
             try
@@ -782,7 +808,7 @@ namespace TempHumidityMonitor
                     { isAlarm = true; alarmMsg = string.Format("T:{0:F1}/H:{1:F1}", temp, humi); }
                 }
 
-                using (var conn = new SQLiteConnection(dbConnStr))
+                using (var conn = new SQLiteConnection("Data Source=" + GetDbPath() + ";Version=3;"))
                 {
                     conn.Open();
                     string sql = @"INSERT INTO sensor_data (timestamp, temperature, humidity, read_mode, is_simulated, is_alarm, alarm_msg)
