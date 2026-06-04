@@ -20,12 +20,6 @@ DataLog/
 Thumbs.db
 Desktop.ini
 
-# NuGet packages
-packages/
-
-# Database files
-*.db
-
 # Temp files
 *.tmp
 *.log

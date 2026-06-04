@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -18,63 +17,69 @@ namespace TempHumidityMonitor
         // ==================== 运行时字段 ====================
         private int nSend = 0, nReceive = 0, nError = 0;
         private int maxChartPoint = 30;
-        private Queue<float> tempQueue, humiQueue;
+        private Queue<float> tempQueue, humiQueue, pressureQueue;
         private Queue<DateTime> timeQueue;
         private float tempMin = float.MaxValue, tempMax = float.MinValue, tempSum = 0;
         private float humiMin = float.MaxValue, humiMax = float.MinValue, humiSum = 0;
+        private float pressureMin = float.MaxValue, pressureMax = float.MinValue, pressureSum = 0;
         private int dataCount = 0;
         private List<byte> receiveBuffer = new List<byte>();
         private string logFilePath;
-        private string GetDbPath() { return Path.Combine(Application.StartupPath, "TempHumidityData.db"); }
         private bool isComOpen = false;
         private bool isSimMode = false;
         private DateTime lastReceiveTime = DateTime.MinValue;
         private Random simRandom = new Random();
-        private float simTemp = 25.0f, simHumi = 55.0f;
-        private float lastTemp = 0, lastHumi = 0;
+        private float simTemp = 25.0f, simHumi = 55.0f, simPressure = 101.3f;
+        private float lastTemp = 0, lastHumi = 0, lastPressure = 0;
 
         // ==================== 构造函数 ====================
         public MainForm()
         {
             tempQueue = new Queue<float>();
             humiQueue = new Queue<float>();
+            pressureQueue = new Queue<float>();
             timeQueue = new Queue<DateTime>();
+
+            // 所有控件和事件在 Designer.cs InitializeComponent() 中创建/绑定
             InitializeComponent();
-            AddHeaderLabels();
-            InitAfterDesign();
+
+            // 运行时：Chart + Timer/SerialPort + 初始化
+            if (!IsDesignMode())
+            {
+                InitRuntime();
+            }
         }
 
-        private void AddHeaderLabels()
+        private bool IsDesignMode()
         {
-            Font labelFont = new Font("微软雅黑", 9F);
-            // 串口设置面板标签
-            gbSerial.Controls.Add(new Label() { Text = "串口号:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight, Location = new Point(8, 27), Size = new Size(55, 23) });
-            gbSerial.Controls.Add(new Label() { Text = "波特率:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight, Location = new Point(8, 59), Size = new Size(55, 23) });
-
-            // 采集设置TLP标签
-            tlpCollect.Controls.Add(new Label() { Text = "读取模式:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 0);
-            tlpCollect.Controls.Add(new Label() { Text = "间隔(ms):", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 1);
-            tlpCollect.Controls.Add(new Label() { Text = "最大点数:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 2);
-
-            // 报警设置TLP标签
-            tlpAlarm.Controls.Add(new Label() { Text = "温度上限:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 1);
-            tlpAlarm.Controls.Add(new Label() { Text = "温度下限:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 2);
-            tlpAlarm.Controls.Add(new Label() { Text = "湿度上限:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 3);
-            tlpAlarm.Controls.Add(new Label() { Text = "湿度下限:", Font = labelFont, ForeColor = Color.FromArgb(31, 41, 55), TextAlign = ContentAlignment.MiddleRight }, 0, 4);
+            if (System.ComponentModel.LicenseManager.UsageMode == System.ComponentModel.LicenseUsageMode.Designtime)
+                return true;
+            if (System.Diagnostics.Process.GetCurrentProcess().ProcessName == "devenv")
+                return true;
+            return DesignMode;
         }
 
-        private void InitAfterDesign()
+
+        private void InitRuntime()
         {
             initControls();
             LoadSettings();
         }
 
+
         private void MainForm_Load(object sender, EventArgs e)
         {
+            // 预置起始点确保坐标轴始终可见
+            chart1.Series["温度"].Points.AddXY(1, 0);
+            chart1.Series["湿度"].Points.AddXY(1, 0);
+            chart1.Series["气压"].Points.AddXY(1, 0);
         }
 
         private void MainForm_Shown(object sender, EventArgs e)
         {
+            splitContainer1.SplitterDistance = 300;
+            splitContainer1.Panel1MinSize = 260;
+            splitContainer1.Panel2MinSize = 200;
         }
 
         // ==================== 初始化控件状态 ====================
@@ -94,6 +99,8 @@ namespace TempHumidityMonitor
                 nudTempLow.Value = (decimal)Settings.Default.TempLowAlarm;
                 nudHumiHigh.Value = (decimal)Settings.Default.HumiHighAlarm;
                 nudHumiLow.Value = (decimal)Settings.Default.HumiLowAlarm;
+                nudPressureHigh.Value = (decimal)Settings.Default.PressureHighAlarm;
+                nudPressureLow.Value = (decimal)Settings.Default.PressureLowAlarm;
                 chkEnableAlarm.Checked = Settings.Default.EnableAlarm;
                 chkDataLog.Checked = Settings.Default.EnableDataLog;
                 maxChartPoint = Settings.Default.MaxChartPoints;
@@ -101,7 +108,6 @@ namespace TempHumidityMonitor
             catch { }
 
             InitLogFile();
-            InitDatabase();
 
             Timer timeTimer = new Timer { Interval = 1000 };
             timeTimer.Tick += (s, ev) => { tsslTime.Text = DateTime.Now.ToString("HH:mm:ss"); };
@@ -144,9 +150,6 @@ namespace TempHumidityMonitor
                 isComOpen = true;
                 btnOpenCloseCom.Text = "关闭串口"; btnOpenCloseCom.BackColor = Color.LightCoral;
                 tsslStatus.Text = "● 串口已打开 - " + portName; tsslStatus.ForeColor = Color.Green;
-                lblDeviceStatus.Text = "● 串口已连接     ● 正在采集     ● 数据正常";
-                lblDeviceStatus.ForeColor = Color.FromArgb(31, 41, 55);
-                lblCardStatusValue.Text = "在线"; lblCardStatusValue.ForeColor = Color.FromArgb(82, 196, 26);
                 timer1.Interval = (int)nudInterval.Value; timer1.Start();
                 cbComPort.Enabled = false; btnRefreshPorts.Enabled = false; cbBaudRate.Enabled = false;
                 lblStatus.Text = "串口已打开，正在采集数据..."; lblStatus.ForeColor = Color.Green;
@@ -162,9 +165,6 @@ namespace TempHumidityMonitor
                 timer1.Stop(); if (serialPort1.IsOpen) serialPort1.Close();
                 isComOpen = false; btnOpenCloseCom.Text = "打开串口"; btnOpenCloseCom.BackColor = SystemColors.Control;
                 tsslStatus.Text = "● 串口已关闭"; tsslStatus.ForeColor = Color.Gray;
-                lblDeviceStatus.Text = "○ 串口未打开     ○ 等待采集     ○ 数据就绪";
-                lblDeviceStatus.ForeColor = Color.FromArgb(31, 41, 55);
-                lblCardStatusValue.Text = "离线"; lblCardStatusValue.ForeColor = Color.FromArgb(156, 163, 175);
                 cbComPort.Enabled = true; btnRefreshPorts.Enabled = true; cbBaudRate.Enabled = true;
                 lblStatus.Text = "串口已关闭"; lblStatus.ForeColor = Color.Gray;
             }
@@ -181,7 +181,8 @@ namespace TempHumidityMonitor
             {
                 if (isSimMode) { SimulateData(); return; }
                 if (!isComOpen || !serialPort1.IsOpen) return;
-                serialPort1.Write(GetModbusCommand(), 0, 8);
+                byte[] cmd = GetModbusCommand();
+                serialPort1.Write(cmd, 0, cmd.Length);
                 nSend++; tsslSend.Text = "发送: " + nSend;
             }
             catch (Exception ex) { nError++; tsslError.Text = "错误: " + nError; LogError("发送数据失败: " + ex.Message); }
@@ -197,6 +198,10 @@ namespace TempHumidityMonitor
                 case 3: return new byte[] { 0x01, 0x03, 0x00, 0x02, 0x00, 0x02, 0x65, 0xCB };
                 case 4: return new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x01, 0x85, 0xE2 };
                 case 5: return new byte[] { 0x01, 0x03, 0x00, 0x81, 0x00, 0x01, 0xD4, 0x22 };
+                case 6: return new byte[] { 0x01, 0x03, 0x00, 0x04, 0x00, 0x02, 0x85, 0xCA };
+                case 7: return new byte[] { 0x01, 0x03, 0x00, 0x82, 0x00, 0x01, 0x24, 0x22 };
+                case 8: return new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x06, 0xC5, 0xC8 };
+                case 9: return new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x04, 0x45, 0xE1 };
                 default: return new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x04, 0x44, 0x09 };
             }
         }
@@ -207,14 +212,16 @@ namespace TempHumidityMonitor
             simTemp = Math.Max(-20, Math.Min(80, simTemp));
             simHumi += (float)(simRandom.NextDouble() * 6.0 - 3.0);
             simHumi = Math.Max(5, Math.Min(98, simHumi));
+            simPressure += (float)(simRandom.NextDouble() * 2.0 - 1.0);
+            simPressure = Math.Max(95, Math.Min(110, simPressure));
             nSend++; nReceive++;
             tsslSend.Text = "发送: " + nSend; tsslRecv.Text = "接收: " + nReceive;
             lastReceiveTime = DateTime.Now;
-            AddDataPoint(simTemp, simHumi);
-            if (chkEnableAlarm.Checked) CheckAlarm(simTemp, simHumi);
-            if (chkDataLog.Checked) LogDataToFile(simTemp, simHumi);
-            SaveToDatabase(simTemp, simHumi, true);
-            this.BeginInvoke(new Action(() => updateUI(simTemp, simHumi)));
+            AddDataPoint(simTemp, simHumi, simPressure);
+            if (chkEnableAlarm.Checked) CheckAlarm(simTemp, simHumi, simPressure);
+            if (chkDataLog.Checked) LogDataToFile(simTemp, simHumi, simPressure);
+            SaveToDatabase(simTemp, simHumi, simPressure);
+            this.BeginInvoke(new Action(() => updateUI(simTemp, simHumi, simPressure)));
         }
 
         private void btnManualSend_Click(object sender, EventArgs e)
@@ -278,15 +285,15 @@ namespace TempHumidityMonitor
             try
             {
                 if (!checkData(buffer)) { nError++; tsslError.Text = "错误: " + nError; return; }
-                float t, h;
-                getTempHumi(buffer, out t, out h);
-                if (t < -40 || t > 125 || h < 0 || h > 100)
-                { LogError(string.Format("数据超范围: T={0:F1} H={1:F1}", t, h)); return; }
-                AddDataPoint(t, h);
-                if (chkEnableAlarm.Checked) CheckAlarm(t, h);
-                if (chkDataLog.Checked) LogDataToFile(t, h);
-                SaveToDatabase(t, h, false);
-                this.BeginInvoke(new Action(() => updateUI(t, h)));
+                float t, h, p;
+                getSensorData(buffer, out t, out h, out p);
+                if (t < -40 || t > 125 || h < 0 || h > 100 || p < 50 || p > 200)
+                { LogError(string.Format("数据超范围: T={0:F1} H={1:F1} P={2:F1}", t, h, p)); return; }
+                AddDataPoint(t, h, p);
+                if (chkEnableAlarm.Checked) CheckAlarm(t, h, p);
+                if (chkDataLog.Checked) LogDataToFile(t, h, p);
+                SaveToDatabase(t, h, p);
+                this.BeginInvoke(new Action(() => updateUI(t, h, p)));
                 this.BeginInvoke(new Action(() =>
                 { lblStatus.Text = "数据正常 - " + lastReceiveTime.ToString("HH:mm:ss"); lblStatus.ForeColor = Color.Green; }));
             }
@@ -297,89 +304,97 @@ namespace TempHumidityMonitor
             }
         }
 
-        private void AddDataPoint(float t, float h)
+        private void AddDataPoint(float t, float h, float p)
         {
-            while (tempQueue.Count >= maxChartPoint) { tempQueue.Dequeue(); humiQueue.Dequeue(); if (timeQueue.Count > 0) timeQueue.Dequeue(); }
-            tempQueue.Enqueue(t); humiQueue.Enqueue(h); timeQueue.Enqueue(DateTime.Now);
+            while (tempQueue.Count >= maxChartPoint) { tempQueue.Dequeue(); humiQueue.Dequeue(); pressureQueue.Dequeue(); if (timeQueue.Count > 0) timeQueue.Dequeue(); }
+            tempQueue.Enqueue(t); humiQueue.Enqueue(h); pressureQueue.Enqueue(p); timeQueue.Enqueue(DateTime.Now);
             if (t < tempMin) tempMin = t; if (t > tempMax) tempMax = t;
             if (h < humiMin) humiMin = h; if (h > humiMax) humiMax = h;
-            tempSum += t; humiSum += h; dataCount++;
+            if (p < pressureMin) pressureMin = p; if (p > pressureMax) pressureMax = p;
+            tempSum += t; humiSum += h; pressureSum += p; dataCount++;
         }
 
-        private void updateUI(float t, float h)
+        private void updateUI(float t, float h, float p)
         {
-            // 卡片数据
-            lblCardTempValue.Text = string.Format("{0:F1}℃", t);
-            lblCardHumiValue.Text = string.Format("{0:F1}%", h);
+            lblTempValue.Text = string.Format("{0:F1} ℃", t);
+            lblHumiValue.Text = string.Format("{0:F1} %", h);
+            lblPressureValue.Text = string.Format("{0:F1} kPa", p);
             lblUpdateTime.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            lblClockTop.Text = DateTime.Now.ToString("HH:mm:ss");
             UpdateChart();
-            // 统计标签和卡片范围
             if (dataCount > 0)
             {
-                lblCardTempRange.Text = string.Format("↑{0:F1}  ↓{1:F1}", tempMax, tempMin);
-                lblCardHumiRange.Text = string.Format("↑{0:F1}  ↓{1:F1}", humiMax, humiMin);
-                lblTempMin.Text = string.Format("最低:{0:F1}", tempMin);
-                lblTempMax.Text = string.Format("最高:{0:F1}", tempMax);
-                lblTempAvg.Text = string.Format("平均:{0:F1}", tempSum / dataCount);
-                lblHumiMin.Text = string.Format("最低:{0:F1}", humiMin);
-                lblHumiMax.Text = string.Format("最高:{0:F1}", humiMax);
-                lblHumiAvg.Text = string.Format("平均:{0:F1}", humiSum / dataCount);
+                lblTempMin.Text = string.Format("最小: {0:F1}", tempMin);
+                lblTempMax.Text = string.Format("最大: {0:F1}", tempMax);
+                lblTempAvg.Text = string.Format("平均: {0:F1}", tempSum / dataCount);
+                lblHumiMin.Text = string.Format("最小: {0:F1}", humiMin);
+                lblHumiMax.Text = string.Format("最大: {0:F1}", humiMax);
+                lblHumiAvg.Text = string.Format("平均: {0:F1}", humiSum / dataCount);
+                lblPressureMin.Text = string.Format("最小: {0:F1}", pressureMin);
+                lblPressureMax.Text = string.Format("最大: {0:F1}", pressureMax);
+                lblPressureAvg.Text = string.Format("平均: {0:F1}", pressureSum / dataCount);
             }
-            // DataGridView 添加行
-            string status = "正常";
-            if (chkEnableAlarm.Checked)
-            {
-                float tH = (float)nudTempHigh.Value, tL = (float)nudTempLow.Value;
-                float hH = (float)nudHumiHigh.Value, hL = (float)nudHumiLow.Value;
-                if (t > tH || t < tL || h > hH || h < hL) status = "报警";
-            }
-            dgvData.Rows.Insert(0, DateTime.Now.ToString("HH:mm:ss"), string.Format("{0:F1}", t), string.Format("{0:F1}", h), status);
-            while (dgvData.Rows.Count > 100) dgvData.Rows.RemoveAt(dgvData.Rows.Count - 1);
         }
 
         private void UpdateChart()
         {
             chart1.Series["温度"].Points.Clear();
             chart1.Series["湿度"].Points.Clear();
-            float[] ts = tempQueue.ToArray(), hs = humiQueue.ToArray();
+            chart1.Series["气压"].Points.Clear();
+            float[] ts = tempQueue.ToArray(), hs = humiQueue.ToArray(), ps = pressureQueue.ToArray();
             for (int i = 0; i < ts.Length; i++)
-            { chart1.Series["温度"].Points.AddXY(i + 1, ts[i]); chart1.Series["湿度"].Points.AddXY(i + 1, hs[i]); }
-            if (ts.Length > 0 && hs.Length > 0)
             {
-                float min = Math.Min(ts.Min(), hs.Min()) - 5, max = Math.Max(ts.Max(), hs.Max()) + 5;
+                chart1.Series["温度"].Points.AddXY(i + 1, ts[i]);
+                chart1.Series["湿度"].Points.AddXY(i + 1, hs[i]);
+                chart1.Series["气压"].Points.AddXY(i + 1, ps[i]);
+            }
+            if (ts.Length > 0)
+            {
+                float min = Math.Min(Math.Min(ts.Min(), hs.Min()), ps.Min()) - 5;
+                float max = Math.Max(Math.Max(ts.Max(), hs.Max()), ps.Max()) + 5;
                 chart1.ChartAreas["MainArea"].AxisY.Minimum = Math.Max(-50, min);
-                chart1.ChartAreas["MainArea"].AxisY.Maximum = Math.Min(150, max);
+                chart1.ChartAreas["MainArea"].AxisY.Maximum = Math.Min(200, max);
                 chart1.ChartAreas["MainArea"].RecalculateAxesScale();
             }
         }
 
         // ==================== 数据解析 ====================
-        private void getTempHumi(byte[] buf, out float t, out float h)
+        private void getSensorData(byte[] buf, out float t, out float h, out float p)
         {
-            t = lastTemp; h = lastHumi;
+            t = lastTemp; h = lastHumi; p = lastPressure;
             switch (cbReadMode.SelectedIndex)
             {
-                case 0:
+                case 0: // 温湿浮点
                     { byte[] a = { buf[6], buf[5], buf[4], buf[3] }, b = { buf[10], buf[9], buf[8], buf[7] }; t = BitConverter.ToSingle(a, 0); h = BitConverter.ToSingle(b, 0); }
                     break;
-                case 1:
+                case 1: // 温湿整型
                     { t = ((buf[3] << 8) | buf[4]) / 10.0f; h = ((buf[5] << 8) | buf[6]) / 10.0f; }
                     break;
-                case 2:
+                case 2: // 温度浮点
                     { byte[] a = { buf[6], buf[5], buf[4], buf[3] }; t = BitConverter.ToSingle(a, 0); }
                     break;
-                case 3:
+                case 3: // 湿度浮点
                     { byte[] b = { buf[6], buf[5], buf[4], buf[3] }; h = BitConverter.ToSingle(b, 0); }
                     break;
-                case 4:
+                case 4: // 温度整型
                     { t = ((buf[3] << 8) | buf[4]) / 10.0f; }
                     break;
-                case 5:
+                case 5: // 湿度整型
                     { h = ((buf[3] << 8) | buf[4]) / 10.0f; }
                     break;
+                case 6: // 气压浮点
+                    { byte[] c = { buf[6], buf[5], buf[4], buf[3] }; p = BitConverter.ToSingle(c, 0); }
+                    break;
+                case 7: // 气压整型
+                    { p = ((buf[3] << 8) | buf[4]); }
+                    break;
+                case 8: // 温湿压浮点
+                    { byte[] a = { buf[6], buf[5], buf[4], buf[3] }, b = { buf[10], buf[9], buf[8], buf[7] }, c = { buf[14], buf[13], buf[12], buf[11] }; t = BitConverter.ToSingle(a, 0); h = BitConverter.ToSingle(b, 0); p = BitConverter.ToSingle(c, 0); }
+                    break;
+                case 9: // 温湿压整型
+                    { t = ((buf[3] << 8) | buf[4]) / 10.0f; h = ((buf[5] << 8) | buf[6]) / 10.0f; p = ((buf[7] << 8) | buf[8]); }
+                    break;
             }
-            lastTemp = t; lastHumi = h;
+            lastTemp = t; lastHumi = h; lastPressure = p;
         }
 
         private bool checkData(byte[] buf)
@@ -409,39 +424,32 @@ namespace TempHumidityMonitor
                 {
                     uint flag = crc & 0x01;
                     crc >>= 1;
-                    if (flag != 0) crc ^= 0x0a001;
+                    if (flag != 0) crc ^= 0xA001;
                 }
             }
             return BitConverter.GetBytes(crc);
         }
 
         // ==================== 报警 ====================
-        private void CheckAlarm(float t, float h)
+        private void CheckAlarm(float t, float h, float p)
         {
             bool alarm = false;
             List<string> list = new List<string>();
             float tH = (float)nudTempHigh.Value, tL = (float)nudTempLow.Value;
             float hH = (float)nudHumiHigh.Value, hL = (float)nudHumiLow.Value;
+            float pH = (float)nudPressureHigh.Value, pL = (float)nudPressureLow.Value;
             if (t > tH) { list.Add(string.Format("温度过高:{0:F1}>{1:F1}", t, tH)); alarm = true; }
             if (t < tL) { list.Add(string.Format("温度过低:{0:F1}<{1:F1}", t, tL)); alarm = true; }
             if (h > hH) { list.Add(string.Format("湿度过高:{0:F1}>{1:F1}", h, hH)); alarm = true; }
             if (h < hL) { list.Add(string.Format("湿度过低:{0:F1}<{1:F1}", h, hL)); alarm = true; }
+            if (p > pH) { list.Add(string.Format("气压过高:{0:F1}>{1:F1}", p, pH)); alarm = true; }
+            if (p < pL) { list.Add(string.Format("气压过低:{0:F1}<{1:F1}", p, pL)); alarm = true; }
             if (alarm)
             {
                 string msg = string.Join(";", list);
                 this.BeginInvoke(new Action(() =>
-                {
-                    lblStatus.Text = "报警: " + msg; lblStatus.ForeColor = Color.Red;
-                    lblCardAlarmValue.Text = "报警"; lblCardAlarmValue.ForeColor = Color.FromArgb(255, 77, 79);
-                }));
+                { lblStatus.Text = "报警: " + msg; lblStatus.ForeColor = Color.Red; }));
                 LogAlarmToFile(msg);
-            }
-            else
-            {
-                this.BeginInvoke(new Action(() =>
-                {
-                    lblCardAlarmValue.Text = "正常"; lblCardAlarmValue.ForeColor = Color.FromArgb(82, 196, 26);
-                }));
             }
         }
 
@@ -457,7 +465,7 @@ namespace TempHumidityMonitor
             catch (Exception ex) { LogError("初始化日志失败: " + ex.Message); }
         }
 
-        private void LogDataToFile(float t, float h)
+        private void LogDataToFile(float t, float h, float p)
         {
             try
             {
@@ -468,11 +476,43 @@ namespace TempHumidityMonitor
                 using (StreamWriter sw = new StreamWriter(logFilePath, true, Encoding.UTF8))
                 {
                     if (newFile || new FileInfo(logFilePath).Length == 0)
-                        sw.WriteLine("时间,温度(℃),湿度(%)");
-                    sw.WriteLine(string.Format("{0:yyyy-MM-dd HH:mm:ss},{1:F1},{2:F1}", DateTime.Now, t, h));
+                        sw.WriteLine("时间,温度(℃),湿度(%),气压(kPa)");
+                    sw.WriteLine(string.Format("{0:yyyy-MM-dd HH:mm:ss},{1:F1},{2:F1},{3:F1}", DateTime.Now, t, h, p));
                 }
             }
             catch { }
+        }
+
+        private string GetDbPath()
+        {
+            return @"F:\set\TempHumidityData.db";
+        }
+
+        private void SaveToDatabase(float t, float h, float p)
+        {
+            try
+            {
+                using (var conn = new SQLiteConnection("Data Source=" + GetDbPath() + ";Version=3;"))
+                {
+                    conn.Open();
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = @"INSERT INTO sensor_data (timestamp, temperature, humidity, pressure, read_mode, is_simulated, is_alarm, alarm_msg)
+                                           VALUES (@ts, @t, @h, @p, @mode, @sim, 0, '')";
+                        cmd.Parameters.AddWithValue("@ts", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                        cmd.Parameters.AddWithValue("@t", t);
+                        cmd.Parameters.AddWithValue("@h", h);
+                        cmd.Parameters.AddWithValue("@p", p);
+                        cmd.Parameters.AddWithValue("@mode", cbReadMode.Text);
+                        cmd.Parameters.AddWithValue("@sim", isSimMode ? 1 : 0);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError("数据库写入失败: " + ex.Message);
+            }
         }
 
         private void LogAlarmToFile(string msg)
@@ -499,66 +539,6 @@ namespace TempHumidityMonitor
             catch { }
         }
 
-        // ==================== 数据库存储 ====================
-        private void InitDatabase()
-        {
-            try
-            {
-                string dbPath = GetDbPath();
-                using (var conn = new SQLiteConnection("Data Source=" + dbPath + ";Version=3;"))
-                {
-                    conn.Open();
-                    string sql = @"CREATE TABLE IF NOT EXISTS sensor_data (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        timestamp TEXT NOT NULL,
-                        temperature REAL,
-                        humidity REAL,
-                        read_mode TEXT,
-                        is_simulated INTEGER DEFAULT 0,
-                        is_alarm INTEGER DEFAULT 0,
-                        alarm_msg TEXT);";
-                    using (var cmd = new SQLiteCommand(sql, conn))
-                        cmd.ExecuteNonQuery();
-                }
-            }
-            catch { }
-        }
-
-        private void SaveToDatabase(float temp, float humi, bool isSim)
-        {
-            try
-            {
-                bool isAlarm = false;
-                string alarmMsg = null;
-                if (chkEnableAlarm.Checked)
-                {
-                    float tH = (float)nudTempHigh.Value, tL = (float)nudTempLow.Value;
-                    float hH = (float)nudHumiHigh.Value, hL = (float)nudHumiLow.Value;
-                    if (temp > tH || temp < tL || humi > hH || humi < hL)
-                    { isAlarm = true; alarmMsg = string.Format("T:{0:F1}/H:{1:F1}", temp, humi); }
-                }
-
-                using (var conn = new SQLiteConnection("Data Source=" + GetDbPath() + ";Version=3;"))
-                {
-                    conn.Open();
-                    string sql = @"INSERT INTO sensor_data (timestamp, temperature, humidity, read_mode, is_simulated, is_alarm, alarm_msg)
-                                   VALUES (@ts, @t, @h, @mode, @sim, @alarm, @msg)";
-                    using (var cmd = new SQLiteCommand(sql, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@ts", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                        cmd.Parameters.AddWithValue("@t", temp);
-                        cmd.Parameters.AddWithValue("@h", humi);
-                        cmd.Parameters.AddWithValue("@mode", cbReadMode.Text);
-                        cmd.Parameters.AddWithValue("@sim", isSim ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@alarm", isAlarm ? 1 : 0);
-                        cmd.Parameters.AddWithValue("@msg", (object)alarmMsg ?? DBNull.Value);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-            }
-            catch { }
-        }
-
         // ==================== 导出CSV ====================
         private void btnExportCSV_Click(object sender, EventArgs e)
         {
@@ -571,9 +551,9 @@ namespace TempHumidityMonitor
                     {
                         using (StreamWriter sw = new StreamWriter(sfd.FileName, false, Encoding.UTF8))
                         {
-                            sw.WriteLine("序号,温度(℃),湿度(%)");
-                            float[] ts = tempQueue.ToArray(), hs = humiQueue.ToArray();
-                            for (int i = 0; i < ts.Length; i++) sw.WriteLine("{0},{1:F1},{2:F1}", i + 1, ts[i], hs[i]);
+                            sw.WriteLine("序号,温度(℃),湿度(%),气压(kPa)");
+                            float[] ts = tempQueue.ToArray(), hs = humiQueue.ToArray(), ps = pressureQueue.ToArray();
+                            for (int i = 0; i < ts.Length; i++) sw.WriteLine("{0},{1:F1},{2:F1},{3:F1}", i + 1, ts[i], hs[i], ps[i]);
                         }
                         ShowTip(string.Format("已导出{0}条记录", tempQueue.Count));
                     }
@@ -588,10 +568,9 @@ namespace TempHumidityMonitor
 
         private void ClearAllData()
         {
-            tempQueue.Clear(); humiQueue.Clear(); timeQueue.Clear(); ClearStats();
-            chart1.Series["温度"].Points.Clear(); chart1.Series["湿度"].Points.Clear();
-            dgvData.Rows.Clear();
-            lblCardTempValue.Text = "--.-℃"; lblCardHumiValue.Text = "--.-%";
+            tempQueue.Clear(); humiQueue.Clear(); pressureQueue.Clear(); timeQueue.Clear(); ClearStats();
+            chart1.Series["温度"].Points.Clear(); chart1.Series["湿度"].Points.Clear(); chart1.Series["气压"].Points.Clear();
+            lblTempValue.Text = "--.- ℃"; lblHumiValue.Text = "--.- %"; lblPressureValue.Text = "---.- kPa"; lblUpdateTime.Text = "--";
         }
 
         private void ClearStats()
@@ -599,9 +578,11 @@ namespace TempHumidityMonitor
             dataCount = 0;
             tempMin = float.MaxValue; tempMax = float.MinValue;
             humiMin = float.MaxValue; humiMax = float.MinValue;
-            tempSum = 0; humiSum = 0;
-            lblTempMin.Text = "最低:--"; lblTempMax.Text = "最高:--"; lblTempAvg.Text = "平均:--";
-            lblHumiMin.Text = "最低:--"; lblHumiMax.Text = "最高:--"; lblHumiAvg.Text = "平均:--";
+            pressureMin = float.MaxValue; pressureMax = float.MinValue;
+            tempSum = 0; humiSum = 0; pressureSum = 0;
+            lblTempMin.Text = "最小:--"; lblTempMax.Text = "最大:--"; lblTempAvg.Text = "平均:--";
+            lblHumiMin.Text = "最小:--"; lblHumiMax.Text = "最大:--"; lblHumiAvg.Text = "平均:--";
+            lblPressureMin.Text = "最小:--"; lblPressureMax.Text = "最大:--"; lblPressureAvg.Text = "平均:--";
         }
 
         // ==================== 设置变更 ====================
@@ -614,7 +595,7 @@ namespace TempHumidityMonitor
         private void nudMaxPoints_ValueChanged(object sender, EventArgs e)
         {
             maxChartPoint = (int)nudMaxPoints.Value; Settings.Default.MaxChartPoints = maxChartPoint; Settings.Default.Save();
-            while (tempQueue.Count > maxChartPoint) { tempQueue.Dequeue(); humiQueue.Dequeue(); if (timeQueue.Count > 0) timeQueue.Dequeue(); }
+            while (tempQueue.Count > maxChartPoint) { tempQueue.Dequeue(); humiQueue.Dequeue(); pressureQueue.Dequeue(); if (timeQueue.Count > 0) timeQueue.Dequeue(); }
         }
 
         private void chkEnableAlarm_CheckedChanged(object sender, EventArgs e)
@@ -625,7 +606,7 @@ namespace TempHumidityMonitor
 
         // ==================== 设置持久化 ====================
         private void LoadSettings()
-        { try { Settings.Default.Upgrade(); Settings.Default.Reload(); } catch { } }
+        { try { Settings.Default.Reload(); } catch { } }
 
         private void SaveAllSettings()
         {
@@ -639,6 +620,8 @@ namespace TempHumidityMonitor
                 Settings.Default.TempLowAlarm = (float)nudTempLow.Value;
                 Settings.Default.HumiHighAlarm = (float)nudHumiHigh.Value;
                 Settings.Default.HumiLowAlarm = (float)nudHumiLow.Value;
+                Settings.Default.PressureHighAlarm = (float)nudPressureHigh.Value;
+                Settings.Default.PressureLowAlarm = (float)nudPressureLow.Value;
                 Settings.Default.EnableAlarm = chkEnableAlarm.Checked;
                 Settings.Default.EnableDataLog = chkDataLog.Checked;
                 Settings.Default.Save();

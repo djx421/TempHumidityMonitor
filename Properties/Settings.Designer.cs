@@ -115,5 +115,21 @@ namespace TempHumidityMonitor.Properties
             get { return ((bool)(this["EnableDataLog"])); }
             set { this["EnableDataLog"] = value; }
         }
+
+        [UserScopedSetting]
+        [DefaultSettingValue("110")]
+        public float PressureHighAlarm
+        {
+            get { return ((float)(this["PressureHighAlarm"])); }
+            set { this["PressureHighAlarm"] = value; }
+        }
+
+        [UserScopedSetting]
+        [DefaultSettingValue("90")]
+        public float PressureLowAlarm
+        {
+            get { return ((float)(this["PressureLowAlarm"])); }
+            set { this["PressureLowAlarm"] = value; }
+        }
     }
 }
