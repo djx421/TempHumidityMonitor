@@ -49,11 +49,11 @@ namespace TempHumidityMonitor
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea2 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend2 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series4 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.Series series5 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.Series series6 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.Series series3 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.chkSimMode = new System.Windows.Forms.CheckBox();
             this.gbSerial = new System.Windows.Forms.GroupBox();
@@ -339,6 +339,7 @@ namespace TempHumidityMonitor
             this.nudInterval.Name = "nudInterval";
             this.nudInterval.Size = new System.Drawing.Size(202, 25);
             this.nudInterval.TabIndex = 4;
+            this.nudInterval.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudInterval.Value = new decimal(new int[] {
             1000,
             0,
@@ -366,6 +367,7 @@ namespace TempHumidityMonitor
             this.nudMaxPoints.Name = "nudMaxPoints";
             this.nudMaxPoints.Size = new System.Drawing.Size(202, 25);
             this.nudMaxPoints.TabIndex = 5;
+            this.nudMaxPoints.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudMaxPoints.Value = new decimal(new int[] {
             30,
             0,
@@ -518,7 +520,6 @@ namespace TempHumidityMonitor
             // 
             // lblTempMin
             // 
-            this.lblTempMin.ForeColor = System.Drawing.Color.DarkRed;
             this.lblTempMin.Location = new System.Drawing.Point(48, 14);
             this.lblTempMin.Name = "lblTempMin";
             this.lblTempMin.Size = new System.Drawing.Size(76, 18);
@@ -573,7 +574,6 @@ namespace TempHumidityMonitor
             // 
             // lblPressureMin
             // 
-            this.lblPressureMin.ForeColor = System.Drawing.Color.DarkGreen;
             this.lblPressureMin.Location = new System.Drawing.Point(48, 54);
             this.lblPressureMin.Name = "lblPressureMin";
             this.lblPressureMin.Size = new System.Drawing.Size(76, 18);
@@ -713,6 +713,7 @@ namespace TempHumidityMonitor
             this.nudTempHigh.Name = "nudTempHigh";
             this.nudTempHigh.Size = new System.Drawing.Size(202, 25);
             this.nudTempHigh.TabIndex = 7;
+            this.nudTempHigh.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudTempHigh.Value = new decimal(new int[] {
             40,
             0,
@@ -741,6 +742,7 @@ namespace TempHumidityMonitor
             this.nudTempLow.Name = "nudTempLow";
             this.nudTempLow.Size = new System.Drawing.Size(202, 25);
             this.nudTempLow.TabIndex = 8;
+            this.nudTempLow.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             // 
             // nudHumiHigh
             // 
@@ -748,6 +750,7 @@ namespace TempHumidityMonitor
             this.nudHumiHigh.Name = "nudHumiHigh";
             this.nudHumiHigh.Size = new System.Drawing.Size(202, 25);
             this.nudHumiHigh.TabIndex = 9;
+            this.nudHumiHigh.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudHumiHigh.Value = new decimal(new int[] {
             80,
             0,
@@ -760,6 +763,7 @@ namespace TempHumidityMonitor
             this.nudHumiLow.Name = "nudHumiLow";
             this.nudHumiLow.Size = new System.Drawing.Size(202, 25);
             this.nudHumiLow.TabIndex = 10;
+            this.nudHumiLow.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudHumiLow.Value = new decimal(new int[] {
             20,
             0,
@@ -782,6 +786,7 @@ namespace TempHumidityMonitor
             this.nudPressureHigh.Name = "nudPressureHigh";
             this.nudPressureHigh.Size = new System.Drawing.Size(202, 25);
             this.nudPressureHigh.TabIndex = 11;
+            this.nudPressureHigh.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudPressureHigh.Value = new decimal(new int[] {
             110,
             0,
@@ -804,6 +809,7 @@ namespace TempHumidityMonitor
             this.nudPressureLow.Name = "nudPressureLow";
             this.nudPressureLow.Size = new System.Drawing.Size(202, 25);
             this.nudPressureLow.TabIndex = 12;
+            this.nudPressureLow.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudPressureLow.Value = new decimal(new int[] {
             90,
             0,
@@ -815,7 +821,7 @@ namespace TempHumidityMonitor
             this.gbData.Controls.Add(this.chkDataLog);
             this.gbData.Controls.Add(this.btnExportCSV);
             this.gbData.Controls.Add(this.btnClearChart);
-            this.gbData.Location = new System.Drawing.Point(12, 728);
+            this.gbData.Location = new System.Drawing.Point(12, 722);
             this.gbData.Name = "gbData";
             this.gbData.Size = new System.Drawing.Size(280, 105);
             this.gbData.TabIndex = 6;
@@ -834,7 +840,7 @@ namespace TempHumidityMonitor
             // 
             // btnExportCSV
             // 
-            this.btnExportCSV.Location = new System.Drawing.Point(30, 44);
+            this.btnExportCSV.Location = new System.Drawing.Point(30, 39);
             this.btnExportCSV.Name = "btnExportCSV";
             this.btnExportCSV.Size = new System.Drawing.Size(220, 27);
             this.btnExportCSV.TabIndex = 1;
@@ -842,7 +848,7 @@ namespace TempHumidityMonitor
             // 
             // btnClearChart
             // 
-            this.btnClearChart.Location = new System.Drawing.Point(30, 76);
+            this.btnClearChart.Location = new System.Drawing.Point(30, 69);
             this.btnClearChart.Name = "btnClearChart";
             this.btnClearChart.Size = new System.Drawing.Size(220, 27);
             this.btnClearChart.TabIndex = 2;
@@ -850,68 +856,68 @@ namespace TempHumidityMonitor
             // 
             // lblStatus
             // 
-            this.lblStatus.Location = new System.Drawing.Point(12, 844);
+            this.lblStatus.Location = new System.Drawing.Point(12, 838);
             this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(280, 22);
+            this.lblStatus.Size = new System.Drawing.Size(280, 40);
             this.lblStatus.TabIndex = 7;
             this.lblStatus.Text = "就绪";
             // 
             // chart1
             // 
-            chartArea2.AxisX.MajorGrid.LineColor = System.Drawing.Color.LightGray;
-            chartArea2.AxisX.Title = "采样点序号";
-            chartArea2.AxisX.TitleFont = new System.Drawing.Font("微软雅黑", 9F);
-            chartArea2.AxisY.Interval = 10D;
-            chartArea2.AxisY.MajorGrid.LineColor = System.Drawing.Color.LightGray;
-            chartArea2.AxisY.Maximum = 100D;
-            chartArea2.AxisY.Minimum = -10D;
-            chartArea2.AxisY.Title = "数值";
-            chartArea2.AxisY.TitleFont = new System.Drawing.Font("微软雅黑", 9F);
-            chartArea2.CursorX.IsUserEnabled = true;
-            chartArea2.CursorX.IsUserSelectionEnabled = true;
-            chartArea2.Name = "MainArea";
-            this.chart1.ChartAreas.Add(chartArea2);
+            chartArea1.AxisX.MajorGrid.LineColor = System.Drawing.Color.LightGray;
+            chartArea1.AxisX.Title = "采样点序号";
+            chartArea1.AxisX.TitleFont = new System.Drawing.Font("微软雅黑", 9F);
+            chartArea1.AxisY.Interval = 10D;
+            chartArea1.AxisY.MajorGrid.LineColor = System.Drawing.Color.LightGray;
+            chartArea1.AxisY.Maximum = 100D;
+            chartArea1.AxisY.Minimum = -10D;
+            chartArea1.AxisY.Title = "数值";
+            chartArea1.AxisY.TitleFont = new System.Drawing.Font("微软雅黑", 9F);
+            chartArea1.CursorX.IsUserEnabled = true;
+            chartArea1.CursorX.IsUserSelectionEnabled = true;
+            chartArea1.Name = "MainArea";
+            this.chart1.ChartAreas.Add(chartArea1);
             this.chart1.Dock = System.Windows.Forms.DockStyle.Fill;
-            legend2.Docking = System.Windows.Forms.DataVisualization.Charting.Docking.Top;
-            legend2.Font = new System.Drawing.Font("微软雅黑", 9F);
-            legend2.IsTextAutoFit = false;
-            legend2.Name = "Legend";
-            this.chart1.Legends.Add(legend2);
+            legend1.Docking = System.Windows.Forms.DataVisualization.Charting.Docking.Top;
+            legend1.Font = new System.Drawing.Font("微软雅黑", 9F);
+            legend1.IsTextAutoFit = false;
+            legend1.Name = "Legend";
+            this.chart1.Legends.Add(legend1);
             this.chart1.Location = new System.Drawing.Point(0, 0);
             this.chart1.Name = "chart1";
-            series4.BorderWidth = 2;
-            series4.ChartArea = "MainArea";
-            series4.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
-            series4.Color = System.Drawing.Color.Red;
-            series4.Legend = "Legend";
-            series4.LegendText = "温度 (℃)";
-            series4.MarkerColor = System.Drawing.Color.Red;
-            series4.MarkerSize = 6;
-            series4.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Circle;
-            series4.Name = "温度";
-            series5.BorderWidth = 2;
-            series5.ChartArea = "MainArea";
-            series5.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
-            series5.Color = System.Drawing.Color.Blue;
-            series5.Legend = "Legend";
-            series5.LegendText = "湿度 (%)";
-            series5.MarkerColor = System.Drawing.Color.Blue;
-            series5.MarkerSize = 6;
-            series5.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Diamond;
-            series5.Name = "湿度";
-            series6.BorderWidth = 2;
-            series6.ChartArea = "MainArea";
-            series6.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
-            series6.Color = System.Drawing.Color.Green;
-            series6.Legend = "Legend";
-            series6.LegendText = "气压 (kPa)";
-            series6.MarkerColor = System.Drawing.Color.Green;
-            series6.MarkerSize = 6;
-            series6.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Triangle;
-            series6.Name = "气压";
-            this.chart1.Series.Add(series4);
-            this.chart1.Series.Add(series5);
-            this.chart1.Series.Add(series6);
+            series1.BorderWidth = 2;
+            series1.ChartArea = "MainArea";
+            series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
+            series1.Color = System.Drawing.Color.Red;
+            series1.Legend = "Legend";
+            series1.LegendText = "温度 (℃)";
+            series1.MarkerColor = System.Drawing.Color.Red;
+            series1.MarkerSize = 6;
+            series1.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Circle;
+            series1.Name = "温度";
+            series2.BorderWidth = 2;
+            series2.ChartArea = "MainArea";
+            series2.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
+            series2.Color = System.Drawing.Color.Blue;
+            series2.Legend = "Legend";
+            series2.LegendText = "湿度 (%)";
+            series2.MarkerColor = System.Drawing.Color.Blue;
+            series2.MarkerSize = 6;
+            series2.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Diamond;
+            series2.Name = "湿度";
+            series3.BorderWidth = 2;
+            series3.ChartArea = "MainArea";
+            series3.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
+            series3.Color = System.Drawing.Color.Green;
+            series3.Legend = "Legend";
+            series3.LegendText = "气压 (kPa)";
+            series3.MarkerColor = System.Drawing.Color.Green;
+            series3.MarkerSize = 6;
+            series3.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Triangle;
+            series3.Name = "气压";
+            this.chart1.Series.Add(series1);
+            this.chart1.Series.Add(series2);
+            this.chart1.Series.Add(series3);
             this.chart1.Size = new System.Drawing.Size(811, 877);
             this.chart1.TabIndex = 0;
             // 
@@ -996,7 +1002,6 @@ namespace TempHumidityMonitor
             this.ResumeLayout(false);
             this.PerformLayout();
 
-            // ---- 事件绑定 ----
             this.Load += MainForm_Load;
             this.Shown += MainForm_Shown;
             this.FormClosing += MainForm_FormClosing;
@@ -1012,6 +1017,12 @@ namespace TempHumidityMonitor
             this.cbReadMode.SelectedIndexChanged += cbReadMode_SelectedIndexChanged;
             this.nudInterval.ValueChanged += nudInterval_ValueChanged;
             this.nudMaxPoints.ValueChanged += nudMaxPoints_ValueChanged;
+            this.nudTempHigh.ValueChanged += SyncAlarmThresholds;
+            this.nudTempLow.ValueChanged += SyncAlarmThresholds;
+            this.nudHumiHigh.ValueChanged += SyncAlarmThresholds;
+            this.nudHumiLow.ValueChanged += SyncAlarmThresholds;
+            this.nudPressureHigh.ValueChanged += SyncAlarmThresholds;
+            this.nudPressureLow.ValueChanged += SyncAlarmThresholds;
             this.timer1.Tick += timer1_Tick;
             this.serialPort1.DataReceived += serialPort1_DataReceived;
             this.serialPort1.ErrorReceived += serialPort1_ErrorReceived;

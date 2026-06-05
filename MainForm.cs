@@ -30,7 +30,13 @@ namespace TempHumidityMonitor
         private DateTime lastReceiveTime = DateTime.MinValue;
         private Random simRandom = new Random();
         private float simTemp = 25.0f, simHumi = 55.0f, simPressure = 101.3f;
-        private float lastTemp = 0, lastHumi = 0, lastPressure = 0;
+        private float lastTemp = 0, lastHumi = 0, lastPressure = 101.3f;
+        // 缓存报警阈值，避免后台线程直接访问 NumericUpDown
+        private int readModeIndex = 0;
+        private float alarmTempH = 40, alarmTempL = 0;
+        private float alarmHumiH = 80, alarmHumiL = 20;
+        private float alarmPressH = 110, alarmPressL = 90;
+        private bool alarmEnabled = false, dataLogEnabled = true;
 
         // ==================== 构造函数 ====================
         public MainForm()
@@ -94,7 +100,8 @@ namespace TempHumidityMonitor
                     cbBaudRate.Text = Settings.Default.BaudRate.ToString();
                 nudInterval.Value = Settings.Default.SampleInterval;
                 nudMaxPoints.Value = Settings.Default.MaxChartPoints;
-                cbReadMode.SelectedIndex = Settings.Default.ReadMode;
+                readModeIndex = Settings.Default.ReadMode;
+                cbReadMode.SelectedIndex = readModeIndex;
                 nudTempHigh.Value = (decimal)Settings.Default.TempHighAlarm;
                 nudTempLow.Value = (decimal)Settings.Default.TempLowAlarm;
                 nudHumiHigh.Value = (decimal)Settings.Default.HumiHighAlarm;
@@ -102,7 +109,15 @@ namespace TempHumidityMonitor
                 nudPressureHigh.Value = (decimal)Settings.Default.PressureHighAlarm;
                 nudPressureLow.Value = (decimal)Settings.Default.PressureLowAlarm;
                 chkEnableAlarm.Checked = Settings.Default.EnableAlarm;
+                alarmEnabled = chkEnableAlarm.Checked;
                 chkDataLog.Checked = Settings.Default.EnableDataLog;
+                dataLogEnabled = chkDataLog.Checked;
+                alarmTempH = (float)nudTempHigh.Value;
+                alarmTempL = (float)nudTempLow.Value;
+                alarmHumiH = (float)nudHumiHigh.Value;
+                alarmHumiL = (float)nudHumiLow.Value;
+                alarmPressH = (float)nudPressureHigh.Value;
+                alarmPressL = (float)nudPressureLow.Value;
                 maxChartPoint = Settings.Default.MaxChartPoints;
             }
             catch { }
@@ -190,7 +205,7 @@ namespace TempHumidityMonitor
 
         private byte[] GetModbusCommand()
         {
-            switch (cbReadMode.SelectedIndex)
+            switch (readModeIndex)
             {
                 case 0: return new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x04, 0x44, 0x09 };
                 case 1: return new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x04, 0x45, 0xE1 };
@@ -218,8 +233,8 @@ namespace TempHumidityMonitor
             tsslSend.Text = "发送: " + nSend; tsslRecv.Text = "接收: " + nReceive;
             lastReceiveTime = DateTime.Now;
             AddDataPoint(simTemp, simHumi, simPressure);
-            if (chkEnableAlarm.Checked) CheckAlarm(simTemp, simHumi, simPressure);
-            if (chkDataLog.Checked) LogDataToFile(simTemp, simHumi, simPressure);
+            if (alarmEnabled) CheckAlarm(simTemp, simHumi, simPressure);
+            if (dataLogEnabled) LogDataToFile(simTemp, simHumi, simPressure);
             SaveToDatabase(simTemp, simHumi, simPressure);
             this.BeginInvoke(new Action(() => updateUI(simTemp, simHumi, simPressure)));
         }
@@ -277,21 +292,31 @@ namespace TempHumidityMonitor
         }
 
         private void serialPort1_ErrorReceived(object sender, SerialErrorReceivedEventArgs e)
-        { nError++; tsslError.Text = "错误: " + nError; LogError("串口错误: " + e.EventType); }
+        {
+            nError++;
+            LogError("串口错误: " + e.EventType);
+            this.BeginInvoke(new Action(() => { tsslError.Text = "错误: " + nError; }));
+        }
 
         private void ProcessFrame(byte[] buffer)
         {
-            nReceive++; tsslRecv.Text = "接收: " + nReceive; lastReceiveTime = DateTime.Now;
+            nReceive++; lastReceiveTime = DateTime.Now;
+            this.BeginInvoke(new Action(() => { tsslRecv.Text = "接收: " + nReceive; }));
             try
             {
-                if (!checkData(buffer)) { nError++; tsslError.Text = "错误: " + nError; return; }
+                if (!checkData(buffer))
+                {
+                    nError++;
+                    this.BeginInvoke(new Action(() => { tsslError.Text = "错误: " + nError; }));
+                    return;
+                }
                 float t, h, p;
                 getSensorData(buffer, out t, out h, out p);
                 if (t < -40 || t > 125 || h < 0 || h > 100 || p < 50 || p > 200)
                 { LogError(string.Format("数据超范围: T={0:F1} H={1:F1} P={2:F1}", t, h, p)); return; }
                 AddDataPoint(t, h, p);
-                if (chkEnableAlarm.Checked) CheckAlarm(t, h, p);
-                if (chkDataLog.Checked) LogDataToFile(t, h, p);
+                if (alarmEnabled) CheckAlarm(t, h, p);
+                if (dataLogEnabled) LogDataToFile(t, h, p);
                 SaveToDatabase(t, h, p);
                 this.BeginInvoke(new Action(() => updateUI(t, h, p)));
                 this.BeginInvoke(new Action(() =>
@@ -299,8 +324,14 @@ namespace TempHumidityMonitor
             }
             catch (Exception ex)
             {
-                nError++; tsslError.Text = "错误: " + nError; LogError("帧处理异常: " + ex.Message);
-                this.BeginInvoke(new Action(() => { lblStatus.Text = "解析错误: " + ex.Message; lblStatus.ForeColor = Color.Red; }));
+                nError++;
+                LogError("帧处理异常: " + ex.Message);
+                this.BeginInvoke(new Action(() =>
+                {
+                    tsslError.Text = "错误: " + nError;
+                    lblStatus.Text = "解析错误: " + ex.Message;
+                    lblStatus.ForeColor = Color.Red;
+                }));
             }
         }
 
@@ -361,7 +392,7 @@ namespace TempHumidityMonitor
         private void getSensorData(byte[] buf, out float t, out float h, out float p)
         {
             t = lastTemp; h = lastHumi; p = lastPressure;
-            switch (cbReadMode.SelectedIndex)
+            switch (readModeIndex)
             {
                 case 0: // 温湿浮点
                     { byte[] a = { buf[6], buf[5], buf[4], buf[3] }, b = { buf[10], buf[9], buf[8], buf[7] }; t = BitConverter.ToSingle(a, 0); h = BitConverter.ToSingle(b, 0); }
@@ -433,17 +464,15 @@ namespace TempHumidityMonitor
         // ==================== 报警 ====================
         private void CheckAlarm(float t, float h, float p)
         {
+            if (!alarmEnabled) return;
             bool alarm = false;
             List<string> list = new List<string>();
-            float tH = (float)nudTempHigh.Value, tL = (float)nudTempLow.Value;
-            float hH = (float)nudHumiHigh.Value, hL = (float)nudHumiLow.Value;
-            float pH = (float)nudPressureHigh.Value, pL = (float)nudPressureLow.Value;
-            if (t > tH) { list.Add(string.Format("温度过高:{0:F1}>{1:F1}", t, tH)); alarm = true; }
-            if (t < tL) { list.Add(string.Format("温度过低:{0:F1}<{1:F1}", t, tL)); alarm = true; }
-            if (h > hH) { list.Add(string.Format("湿度过高:{0:F1}>{1:F1}", h, hH)); alarm = true; }
-            if (h < hL) { list.Add(string.Format("湿度过低:{0:F1}<{1:F1}", h, hL)); alarm = true; }
-            if (p > pH) { list.Add(string.Format("气压过高:{0:F1}>{1:F1}", p, pH)); alarm = true; }
-            if (p < pL) { list.Add(string.Format("气压过低:{0:F1}<{1:F1}", p, pL)); alarm = true; }
+            if (t > alarmTempH) { list.Add(string.Format("温度高:{0:F1}", t, alarmTempH)); alarm = true; }
+            if (t < alarmTempL) { list.Add(string.Format("温度低:{0:F1}", t, alarmTempL)); alarm = true; }
+            if (h > alarmHumiH) { list.Add(string.Format("湿度高:{0:F1}", h, alarmHumiH)); alarm = true; }
+            if (h < alarmHumiL) { list.Add(string.Format("湿度低:{0:F1}", h, alarmHumiL)); alarm = true; }
+            if (p > alarmPressH) { list.Add(string.Format("气压高:{0:F1}", p, alarmPressH)); alarm = true; }
+            if (p < alarmPressL) { list.Add(string.Format("气压低:{0:F1}", p, alarmPressL)); alarm = true; }
             if (alarm)
             {
                 string msg = string.Join(";", list);
@@ -485,7 +514,7 @@ namespace TempHumidityMonitor
 
         private string GetDbPath()
         {
-            return @"F:\set\TempHumidityData.db";
+            return Path.Combine(Application.StartupPath, "TempHumidityData.db");
         }
 
         private void SaveToDatabase(float t, float h, float p)
@@ -503,7 +532,7 @@ namespace TempHumidityMonitor
                         cmd.Parameters.AddWithValue("@t", t);
                         cmd.Parameters.AddWithValue("@h", h);
                         cmd.Parameters.AddWithValue("@p", p);
-                        cmd.Parameters.AddWithValue("@mode", cbReadMode.Text);
+                        cmd.Parameters.AddWithValue("@mode", readModeIndex.ToString());
                         cmd.Parameters.AddWithValue("@sim", isSimMode ? 1 : 0);
                         cmd.ExecuteNonQuery();
                     }
@@ -587,7 +616,7 @@ namespace TempHumidityMonitor
 
         // ==================== 设置变更 ====================
         private void cbReadMode_SelectedIndexChanged(object sender, EventArgs e)
-        { Settings.Default.ReadMode = cbReadMode.SelectedIndex; Settings.Default.Save(); }
+        { readModeIndex = cbReadMode.SelectedIndex; Settings.Default.ReadMode = readModeIndex; Settings.Default.Save(); }
 
         private void nudInterval_ValueChanged(object sender, EventArgs e)
         { Settings.Default.SampleInterval = (int)nudInterval.Value; Settings.Default.Save(); if (timer1 != null && isComOpen) timer1.Interval = (int)nudInterval.Value; }
@@ -599,10 +628,20 @@ namespace TempHumidityMonitor
         }
 
         private void chkEnableAlarm_CheckedChanged(object sender, EventArgs e)
-        { Settings.Default.EnableAlarm = chkEnableAlarm.Checked; Settings.Default.Save(); }
+        { alarmEnabled = chkEnableAlarm.Checked; Settings.Default.EnableAlarm = alarmEnabled; Settings.Default.Save(); }
 
         private void chkDataLog_CheckedChanged(object sender, EventArgs e)
-        { Settings.Default.EnableDataLog = chkDataLog.Checked; Settings.Default.Save(); }
+        { dataLogEnabled = chkDataLog.Checked; Settings.Default.EnableDataLog = dataLogEnabled; Settings.Default.Save(); }
+
+        private void SyncAlarmThresholds(object sender, EventArgs e)
+        {
+            alarmTempH = (float)nudTempHigh.Value;
+            alarmTempL = (float)nudTempLow.Value;
+            alarmHumiH = (float)nudHumiHigh.Value;
+            alarmHumiL = (float)nudHumiLow.Value;
+            alarmPressH = (float)nudPressureHigh.Value;
+            alarmPressL = (float)nudPressureLow.Value;
+        }
 
         // ==================== 设置持久化 ====================
         private void LoadSettings()
