@@ -36,7 +36,8 @@ namespace TempHumidityMonitor
         private Chart chart1;
         private GroupBox gbCurrent, gbStatsTemp, gbStatsHumi, gbStatsPress;
         private GroupBox gbHistory;
-        private Button btnClearStats, btnQueryHistory, btnExportHistory;
+        private Button btnQueryHistory, btnExportHistory;
+        private CheckBox chkAlarmOnly;
         private DateTimePicker dtpStart, dtpEnd;
         private DataGridView dgvHistory;
 
@@ -108,7 +109,6 @@ namespace TempHumidityMonitor
             this.lblPressureMin = new System.Windows.Forms.Label();
             this.lblPressureMax = new System.Windows.Forms.Label();
             this.lblPressureAvg = new System.Windows.Forms.Label();
-            this.btnClearStats = new System.Windows.Forms.Button();
             this.gbAlarm = new System.Windows.Forms.GroupBox();
             this.lblTempHigh = new System.Windows.Forms.Label();
             this.lblTempLow = new System.Windows.Forms.Label();
@@ -139,6 +139,7 @@ namespace TempHumidityMonitor
             this.dtpEnd = new System.Windows.Forms.DateTimePicker();
             this.btnQueryHistory = new System.Windows.Forms.Button();
             this.btnExportHistory = new System.Windows.Forms.Button();
+            this.chkAlarmOnly = new System.Windows.Forms.CheckBox();
             this.dgvHistory = new System.Windows.Forms.DataGridView();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.tsslStatus = new System.Windows.Forms.ToolStripStatusLabel();
@@ -199,7 +200,6 @@ namespace TempHumidityMonitor
             this.splitContainer1.Panel2.Controls.Add(this.gbStatsTemp);
             this.splitContainer1.Panel2.Controls.Add(this.gbStatsHumi);
             this.splitContainer1.Panel2.Controls.Add(this.gbStatsPress);
-            this.splitContainer1.Panel2.Controls.Add(this.btnClearStats);
             this.splitContainer1.Panel2.Controls.Add(this.gbHistory);
             this.splitContainer1.Size = new System.Drawing.Size(1222, 877);
             this.splitContainer1.SplitterDistance = 407;
@@ -731,14 +731,6 @@ namespace TempHumidityMonitor
             this.lblPressureAvg.TabIndex = 5;
             this.lblPressureAvg.Text = "--.- kPa";
             //
-            // btnClearStats
-            //
-            this.btnClearStats.Location = new System.Drawing.Point(672, 758);
-            this.btnClearStats.Name = "btnClearStats";
-            this.btnClearStats.Size = new System.Drawing.Size(240, 35);
-            this.btnClearStats.TabIndex = 7;
-            this.btnClearStats.Text = "重置统计";
-            //
             // gbHistory
             //
             this.gbHistory.Controls.Add(this.lblStart);
@@ -747,6 +739,7 @@ namespace TempHumidityMonitor
             this.gbHistory.Controls.Add(this.dtpEnd);
             this.gbHistory.Controls.Add(this.btnQueryHistory);
             this.gbHistory.Controls.Add(this.btnExportHistory);
+            this.gbHistory.Controls.Add(this.chkAlarmOnly);
             this.gbHistory.Controls.Add(this.dgvHistory);
             this.gbHistory.Location = new System.Drawing.Point(4, 80);
             this.gbHistory.Name = "gbHistory";
@@ -807,6 +800,15 @@ namespace TempHumidityMonitor
             this.btnExportHistory.TabIndex = 5;
             this.btnExportHistory.Text = "导出CSV";
             this.btnExportHistory.UseVisualStyleBackColor = true;
+            //
+            // chkAlarmOnly
+            //
+            this.chkAlarmOnly.Location = new System.Drawing.Point(648, 22);
+            this.chkAlarmOnly.Name = "chkAlarmOnly";
+            this.chkAlarmOnly.Size = new System.Drawing.Size(100, 22);
+            this.chkAlarmOnly.TabIndex = 7;
+            this.chkAlarmOnly.Text = "仅报警记录";
+            this.chkAlarmOnly.UseVisualStyleBackColor = true;
             //
             // dgvHistory
             //
@@ -1066,7 +1068,7 @@ namespace TempHumidityMonitor
             this.btnClearChart.Name = "btnClearChart";
             this.btnClearChart.Size = new System.Drawing.Size(220, 27);
             this.btnClearChart.TabIndex = 2;
-            this.btnClearChart.Text = "清除图表";
+            this.btnClearChart.Text = "全部清除";
             // 
             // lblStatus
             // 
@@ -1118,8 +1120,21 @@ namespace TempHumidityMonitor
             chartArea1.AxisY.MajorGrid.LineColor = System.Drawing.Color.LightGray;
             chartArea1.AxisY.Maximum = 100D;
             chartArea1.AxisY.Minimum = -10D;
-            chartArea1.AxisY.Title = "数值";
+            chartArea1.AxisY.LabelStyle.ForeColor = System.Drawing.Color.Black;
+            chartArea1.AxisY.LabelStyle.Format = "0";
+            chartArea1.AxisY.Title = "温度/湿度";
             chartArea1.AxisY.TitleFont = new System.Drawing.Font("微软雅黑", 9F);
+            chartArea1.AxisY2.Enabled = System.Windows.Forms.DataVisualization.Charting.AxisEnabled.True;
+            chartArea1.AxisY2.Interval = 5D;
+            chartArea1.AxisY2.LabelStyle.ForeColor = System.Drawing.Color.Black;
+            chartArea1.AxisY2.LabelStyle.Format = "0.#";
+            chartArea1.AxisY2.MajorGrid.Enabled = false;
+            chartArea1.AxisY2.MajorTickMark.Enabled = true;
+            chartArea1.AxisY2.Maximum = 110D;
+            chartArea1.AxisY2.Minimum = 90D;
+            chartArea1.AxisY2.Title = "气压 (kPa)";
+            chartArea1.AxisY2.TitleFont = new System.Drawing.Font("微软雅黑", 9F);
+            chartArea1.AxisY2.TitleForeColor = System.Drawing.Color.Black;
             chartArea1.CursorX.IsUserEnabled = true;
             chartArea1.CursorX.IsUserSelectionEnabled = true;
             chartArea1.Name = "MainArea";
@@ -1142,6 +1157,7 @@ namespace TempHumidityMonitor
             series1.MarkerSize = 6;
             series1.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Circle;
             series1.Name = "温度";
+            series1.ToolTip = "温度: #VAL{F1} ℃";
             series2.BorderWidth = 2;
             series2.ChartArea = "MainArea";
             series2.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
@@ -1152,6 +1168,7 @@ namespace TempHumidityMonitor
             series2.MarkerSize = 6;
             series2.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Diamond;
             series2.Name = "湿度";
+            series2.ToolTip = "湿度: #VAL{F1} %";
             series3.BorderWidth = 2;
             series3.ChartArea = "MainArea";
             series3.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
@@ -1162,6 +1179,8 @@ namespace TempHumidityMonitor
             series3.MarkerSize = 6;
             series3.MarkerStyle = System.Windows.Forms.DataVisualization.Charting.MarkerStyle.Triangle;
             series3.Name = "气压";
+            series3.ToolTip = "气压: #VAL{F1} kPa";
+            series3.YAxisType = System.Windows.Forms.DataVisualization.Charting.AxisType.Secondary;
             this.chart1.Series.Add(series1);
             this.chart1.Series.Add(series2);
             this.chart1.Series.Add(series3);
@@ -1260,7 +1279,6 @@ namespace TempHumidityMonitor
             this.btnRefreshPorts.Click += btnRefreshPorts_Click;
             this.btnOpenCloseCom.Click += btnOpenCloseCom_Click;
             this.btnManualSend.Click += btnManualSend_Click;
-            this.btnClearStats.Click += btnClearStats_Click;
             this.btnExportCSV.Click += btnExportCSV_Click;
             this.btnClearChart.Click += btnClearChart_Click;
             this.chkEnableAlarm.CheckedChanged += chkEnableAlarm_CheckedChanged;

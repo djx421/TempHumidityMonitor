@@ -38,6 +38,13 @@ namespace TempHumidityMonitor
         private float alarmPressH = 110, alarmPressL = 90;
         private bool alarmEnabled = false, dataLogEnabled = true;
         private bool isReading = false;
+        private string lastAlarmMsg = "";
+        private DateTime lastAlarmSound = DateTime.MinValue;
+        private int reconnectRetry = 0;
+        private string lastPortName = "";
+        private bool isReconnecting = false;
+        private int connectVersion = 0;
+        private Timer reconnectTimer;
 
         // ==================== 构造函数 ====================
         public MainForm()
@@ -162,12 +169,14 @@ namespace TempHumidityMonitor
                 string portName = cbComPort.Text;
                 if (string.IsNullOrEmpty(portName) || portName == "无可用串口") { ShowTip("请选择有效的串口号"); return; }
                 serialPort1.PortName = portName;
+                lastPortName = portName;
                 serialPort1.BaudRate = int.Parse(cbBaudRate.Text);
                 serialPort1.DataBits = 8; serialPort1.StopBits = StopBits.One; serialPort1.Parity = Parity.None;
                 serialPort1.ReadTimeout = 500; serialPort1.WriteTimeout = 500;
                 serialPort1.Open();
                 isComOpen = true;
                 btnOpenCloseCom.Text = "关闭串口"; btnOpenCloseCom.BackColor = Color.LightCoral;
+                reconnectRetry = 0; isReconnecting = false;
                 tsslStatus.Text = "● 串口已打开 - " + portName; tsslStatus.ForeColor = Color.Green;
                 timer1.Interval = (int)nudInterval.Value;
                 isReading = true; UpdateToggleButton();
@@ -176,7 +185,7 @@ namespace TempHumidityMonitor
                 lblStatus.Text = "串口已打开，正在采集数据..."; lblStatus.ForeColor = Color.Green;
                 receiveBuffer.Clear();
             }
-            catch (Exception ex) { ShowTip("打开串口失败: " + ex.Message); LogError("打开串口失败: " + ex.Message); }
+            catch (Exception ex) { if (!isReconnecting) ShowTip("打开串口失败: " + ex.Message); LogError("打开串口失败: " + ex.Message); }
         }
 
         private void closeComPort()
@@ -196,7 +205,15 @@ namespace TempHumidityMonitor
         }
 
         // ==================== 定时器 ====================
-        private void timer1_Tick(object sender, EventArgs e) { if (isReading) sendData(); }
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            if (isComOpen && !isSimMode && lastReceiveTime > DateTime.MinValue &&
+                (DateTime.Now - lastReceiveTime).TotalSeconds > 15)
+            {
+                TryReconnect(); return;
+            }
+            if (isReading) sendData();
+        }
 
         // ==================== 发送数据 ====================
         private void sendData()
@@ -209,7 +226,12 @@ namespace TempHumidityMonitor
                 serialPort1.Write(cmd, 0, cmd.Length);
                 nSend++; tsslSend.Text = "发送: " + nSend;
             }
-            catch (Exception ex) { nError++; tsslError.Text = "错误: " + nError; LogError("发送数据失败: " + ex.Message); }
+            catch (Exception ex)
+            {
+                nError++; tsslError.Text = "错误: " + nError;
+                LogError("发送数据失败: " + ex.Message);
+                if (isComOpen) TryReconnect();
+            }
         }
 
         private byte[] GetModbusCommand()
@@ -301,14 +323,80 @@ namespace TempHumidityMonitor
                     ProcessFrame(frame);
                 }
             }
-            catch (Exception ex) { LogError("接收异常: " + ex.Message); nError++; UpdateStatus(); }
+            catch (Exception ex) { LogError("接收异常: " + ex.Message); nError++; UpdateStatus(); if (isComOpen) this.BeginInvoke(new Action(() => TryReconnect())); }
         }
 
         private void serialPort1_ErrorReceived(object sender, SerialErrorReceivedEventArgs e)
         {
             nError++;
             LogError("串口错误: " + e.EventType);
-            this.BeginInvoke(new Action(() => { tsslError.Text = "错误: " + nError; }));
+            this.BeginInvoke(new Action(() =>
+            {
+                tsslError.Text = "错误: " + nError;
+                if (isComOpen)
+                {
+                    TryReconnect();
+                }
+            }));
+        }
+
+        private void TryReconnect()
+        {
+            if (isReconnecting) return;
+            isReconnecting = true;
+            connectVersion++;
+            lastAlarmMsg = "";
+            reconnectRetry = 0;
+            try { serialPort1.Close(); } catch { }
+            isComOpen = false; isReading = false;
+            timer1.Stop();
+            btnOpenCloseCom.Text = "打开串口"; btnOpenCloseCom.BackColor = SystemColors.Control;
+            btnToggleRead.Enabled = false; btnToggleRead.Text = "▶ 开始采集"; btnToggleRead.BackColor = SystemColors.Control;
+            tsslStatus.Text = "● 串口断线重连中"; tsslStatus.ForeColor = Color.OrangeRed;
+            DoRetry();
+        }
+
+        private void DoRetry()
+        {
+            if (isSimMode) { isReconnecting = false; return; }
+            if (reconnectRetry >= 3)
+            {
+                isReconnecting = false;
+                lblStatus.Text = "自动重连失败(已重试3次)，请手动打开串口";
+                lblStatus.ForeColor = Color.Red;
+                tsslStatus.Text = "● 串口未打开"; tsslStatus.ForeColor = Color.Gray;
+                return;
+            }
+            reconnectRetry++;
+            lblStatus.Text = string.Format("串口断开，5秒后自动重连({0}/3)...", reconnectRetry);
+            lblStatus.ForeColor = Color.OrangeRed;
+            if (reconnectTimer == null)
+            {
+                reconnectTimer = new Timer { Interval = 5000 };
+                reconnectTimer.Tick += (s, ev) =>
+                {
+                    reconnectTimer.Stop();
+                    RefreshComPorts();
+                    if (!string.IsNullOrEmpty(lastPortName) && cbComPort.Items.Contains(lastPortName))
+                        cbComPort.Text = lastPortName;
+                    else if (cbComPort.Items.Count > 0 && cbComPort.Items[0].ToString() != "无可用串口")
+                        cbComPort.SelectedIndex = 0;
+                    openComPort();
+                    if (isComOpen)
+                    {
+                        isReconnecting = false;
+                        reconnectRetry = 0;
+                        lastReceiveTime = DateTime.Now;
+                        lblStatus.Text = "串口已恢复，正在采集数据...";
+                        lblStatus.ForeColor = Color.Green;
+                    }
+                    else
+                    {
+                        DoRetry();
+                    }
+                };
+            }
+            reconnectTimer.Start();
         }
 
         private void ProcessFrame(byte[] buffer)
@@ -331,9 +419,14 @@ namespace TempHumidityMonitor
                 if (alarmEnabled) CheckAlarm(t, h, p);
                 if (dataLogEnabled) LogDataToFile(t, h, p);
                 SaveToDatabase(t, h, p);
+                bool hasAlarm = alarmEnabled && (t > alarmTempH || t < alarmTempL || h > alarmHumiH || h < alarmHumiL || p > alarmPressH || p < alarmPressL);
                 this.BeginInvoke(new Action(() => updateUI(t, h, p)));
-                this.BeginInvoke(new Action(() =>
-                { lblStatus.Text = "数据正常 - " + lastReceiveTime.ToString("HH:mm:ss"); lblStatus.ForeColor = Color.Green; }));
+                if (!hasAlarm)
+                {
+                    int ver2 = connectVersion;
+                    this.BeginInvoke(new Action(() =>
+                    { if (ver2 == connectVersion) { lblStatus.Text = "数据正常 - " + lastReceiveTime.ToString("HH:mm:ss"); lblStatus.ForeColor = Color.Green; } }));
+                }
             }
             catch (Exception ex)
             {
@@ -393,10 +486,15 @@ namespace TempHumidityMonitor
             }
             if (ts.Length > 0)
             {
-                float min = Math.Min(Math.Min(ts.Min(), hs.Min()), ps.Min()) - 5;
-                float max = Math.Max(Math.Max(ts.Max(), hs.Max()), ps.Max()) + 5;
-                chart1.ChartAreas["MainArea"].AxisY.Minimum = Math.Max(-50, min);
-                chart1.ChartAreas["MainArea"].AxisY.Maximum = Math.Min(200, max);
+                double minTH = Math.Floor(Math.Min(ts.Min(), hs.Min()) - 5);
+                double maxTH = Math.Ceiling(Math.Max(ts.Max(), hs.Max()) + 5);
+                chart1.ChartAreas["MainArea"].AxisY.Minimum = Math.Max(-50, minTH);
+                chart1.ChartAreas["MainArea"].AxisY.Maximum = Math.Min(120, maxTH);
+                double minP = Math.Floor(ps.Min() - 1);
+                double maxP = Math.Ceiling(ps.Max() + 1);
+                chart1.ChartAreas["MainArea"].AxisY2.Minimum = Math.Max(85, minP);
+                chart1.ChartAreas["MainArea"].AxisY2.Maximum = Math.Min(115, maxP);
+                chart1.ChartAreas["MainArea"].AxisY2.Interval = Math.Max(1, Math.Ceiling((maxP - minP) / 4));
                 chart1.ChartAreas["MainArea"].RecalculateAxesScale();
             }
         }
@@ -486,11 +584,18 @@ namespace TempHumidityMonitor
             if (h < alarmHumiL) { list.Add(string.Format("湿度低:{0:F1}", h, alarmHumiL)); alarm = true; }
             if (p > alarmPressH) { list.Add(string.Format("气压高:{0:F1}", p, alarmPressH)); alarm = true; }
             if (p < alarmPressL) { list.Add(string.Format("气压低:{0:F1}", p, alarmPressL)); alarm = true; }
+            string msg = alarm ? string.Join(";", list) : "";
+            lastAlarmMsg = msg;
             if (alarm)
             {
-                string msg = string.Join(";", list);
+                if ((DateTime.Now - lastAlarmSound).TotalSeconds > 60)
+                {
+                    lastAlarmSound = DateTime.Now;
+                    this.BeginInvoke(new Action(() => PlayBeep()));
+                }
+                int ver = connectVersion;
                 this.BeginInvoke(new Action(() =>
-                { lblStatus.Text = "报警: " + msg; lblStatus.ForeColor = Color.Red; }));
+                { if (ver == connectVersion) { lblStatus.Text = "报警: " + msg; lblStatus.ForeColor = Color.Red; } }));
                 LogAlarmToFile(msg);
             }
         }
@@ -548,7 +653,9 @@ namespace TempHumidityMonitor
                     using (var cmd = conn.CreateCommand())
                     {
                         cmd.CommandText = @"INSERT INTO sensor_data (timestamp, temperature, humidity, pressure, read_mode, is_simulated, is_alarm, alarm_msg)
-                                           VALUES (@ts, @t, @h, @p, @mode, @sim, 0, '')";
+                                           VALUES (@ts, @t, @h, @p, @mode, @sim, @alarm, @msg)";
+                        cmd.Parameters.AddWithValue("@alarm", string.IsNullOrEmpty(lastAlarmMsg) ? 0 : 1);
+                        cmd.Parameters.AddWithValue("@msg", lastAlarmMsg);
                         cmd.Parameters.AddWithValue("@ts", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                         cmd.Parameters.AddWithValue("@t", t);
                         cmd.Parameters.AddWithValue("@h", h);
@@ -613,13 +720,28 @@ namespace TempHumidityMonitor
         }
 
         // ==================== 清除 ====================
-        private void btnClearChart_Click(object sender, EventArgs e) { ClearAllData(); }
-        private void btnClearStats_Click(object sender, EventArgs e) { ClearStats(); }
+        private void btnClearChart_Click(object sender, EventArgs e)
+        {
+            if (MessageBox.Show("确定要清除全部数据（图表+统计+队列）？", "确认", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) == DialogResult.OK)
+                ClearAllData();
+        }
+        private void btnClearStats_Click(object sender, EventArgs e)
+        {
+            if (MessageBox.Show("确定要重置统计数据（最小/最大/平均）？", "确认", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) == DialogResult.OK)
+                ClearStats();
+        }
 
         private void ClearAllData()
         {
             tempQueue.Clear(); humiQueue.Clear(); pressureQueue.Clear(); timeQueue.Clear(); ClearStats();
             chart1.Series["温度"].Points.Clear(); chart1.Series["湿度"].Points.Clear(); chart1.Series["气压"].Points.Clear();
+            chart1.Series["温度"].Points.AddXY(1, 0);
+            chart1.Series["湿度"].Points.AddXY(1, 0);
+            chart1.Series["气压"].Points.AddXY(1, 0);
+            chart1.ChartAreas["MainArea"].AxisY.Minimum = -10;
+            chart1.ChartAreas["MainArea"].AxisY.Maximum = 100;
+            chart1.ChartAreas["MainArea"].AxisY2.Minimum = 90;
+            chart1.ChartAreas["MainArea"].AxisY2.Maximum = 110;
             lblTempValue.Text = "--.- ℃"; lblHumiValue.Text = "--.- %"; lblPressureValue.Text = "---.- kPa"; lblUpdateTime.Text = "--";
         }
 
@@ -693,6 +815,31 @@ namespace TempHumidityMonitor
         { SaveAllSettings(); if (isComOpen) closeComPort(); }
 
         // ==================== 辅助 ====================
+        private void PlayBeep()
+        {
+            try
+            {
+                int rate = 8000, freq = 800, dur = 300;
+                int samples = rate * dur / 1000;
+                using (var ms = new MemoryStream())
+                using (var bw = new BinaryWriter(ms))
+                {
+                    bw.Write(new char[] { 'R', 'I', 'F', 'F' });
+                    bw.Write(36 + samples);
+                    bw.Write(new char[] { 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ' });
+                    bw.Write(16); bw.Write((short)1); bw.Write((short)1);
+                    bw.Write(rate); bw.Write(rate); bw.Write((short)1); bw.Write((short)8);
+                    bw.Write(new char[] { 'd', 'a', 't', 'a' });
+                    bw.Write(samples);
+                    for (int i = 0; i < samples; i++)
+                        bw.Write((byte)(128 + 127 * Math.Sin(2 * Math.PI * freq * i / rate)));
+                    bw.Flush(); ms.Position = 0;
+                    new System.Media.SoundPlayer(ms).PlaySync();
+                }
+            }
+            catch { }
+        }
+
         private void ShowTip(string msg) { MessageBox.Show(msg, "提示", MessageBoxButtons.OK, MessageBoxIcon.Information); }
 
         private void UpdateStatus()
@@ -717,7 +864,6 @@ namespace TempHumidityMonitor
             gbStatsTemp.Visible = isCurrent;
             gbStatsHumi.Visible = isCurrent;
             gbStatsPress.Visible = isCurrent;
-            btnClearStats.Visible = isCurrent;
             gbHistory.Visible = !isCurrent;
         }
 
@@ -761,9 +907,11 @@ namespace TempHumidityMonitor
                     conn.Open();
                     using (var cmd = conn.CreateCommand())
                     {
+                        string whereAlarm = chkAlarmOnly.Checked ? " AND is_alarm=1" : "";
                         cmd.CommandText = @"SELECT timestamp as 时间, temperature as 温度, humidity as 湿度,
-                            pressure as 气压, CASE WHEN is_simulated=1 THEN '模拟' ELSE '实时' END as 来源
-                            FROM sensor_data WHERE timestamp BETWEEN @s AND @e ORDER BY timestamp DESC LIMIT 2000";
+                            pressure as 气压, CASE WHEN is_simulated=1 THEN '模拟' ELSE '实时' END as 来源,
+                            CASE WHEN is_alarm=1 THEN alarm_msg ELSE '' END as 报警信息
+                            FROM sensor_data WHERE timestamp BETWEEN @s AND @e" + whereAlarm + " ORDER BY timestamp DESC LIMIT 2000";
                         cmd.Parameters.AddWithValue("@s", dtpStart.Value.ToString("yyyy-MM-dd") + " 00:00:00");
                         cmd.Parameters.AddWithValue("@e", dtpEnd.Value.ToString("yyyy-MM-dd") + " 23:59:59");
                         using (var adapter = new System.Data.SQLite.SQLiteDataAdapter(cmd))
