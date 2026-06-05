@@ -37,6 +37,7 @@ namespace TempHumidityMonitor
         private float alarmHumiH = 80, alarmHumiL = 20;
         private float alarmPressH = 110, alarmPressL = 90;
         private bool alarmEnabled = false, dataLogEnabled = true;
+        private bool isReading = false;
 
         // ==================== 构造函数 ====================
         public MainForm()
@@ -123,6 +124,9 @@ namespace TempHumidityMonitor
             catch { }
 
             InitLogFile();
+            dtpStart.Value = DateTime.Today;
+            dtpEnd.Value = DateTime.Now;
+            SwitchTab(true);
 
             Timer timeTimer = new Timer { Interval = 1000 };
             timeTimer.Tick += (s, ev) => { tsslTime.Text = DateTime.Now.ToString("HH:mm:ss"); };
@@ -165,7 +169,9 @@ namespace TempHumidityMonitor
                 isComOpen = true;
                 btnOpenCloseCom.Text = "关闭串口"; btnOpenCloseCom.BackColor = Color.LightCoral;
                 tsslStatus.Text = "● 串口已打开 - " + portName; tsslStatus.ForeColor = Color.Green;
-                timer1.Interval = (int)nudInterval.Value; timer1.Start();
+                timer1.Interval = (int)nudInterval.Value;
+                isReading = true; UpdateToggleButton();
+                btnToggleRead.Text = "■ 停止采集"; btnToggleRead.BackColor = Color.LightCoral;
                 cbComPort.Enabled = false; btnRefreshPorts.Enabled = false; cbBaudRate.Enabled = false;
                 lblStatus.Text = "串口已打开，正在采集数据..."; lblStatus.ForeColor = Color.Green;
                 receiveBuffer.Clear();
@@ -178,7 +184,10 @@ namespace TempHumidityMonitor
             try
             {
                 timer1.Stop(); if (serialPort1.IsOpen) serialPort1.Close();
-                isComOpen = false; btnOpenCloseCom.Text = "打开串口"; btnOpenCloseCom.BackColor = SystemColors.Control;
+                isComOpen = false; isReading = false;
+                btnOpenCloseCom.Text = "打开串口"; btnOpenCloseCom.BackColor = SystemColors.Control;
+                btnToggleRead.Enabled = false; btnToggleRead.Text = "▶ 开始采集";
+                btnToggleRead.BackColor = SystemColors.Control;
                 tsslStatus.Text = "● 串口已关闭"; tsslStatus.ForeColor = Color.Gray;
                 cbComPort.Enabled = true; btnRefreshPorts.Enabled = true; cbBaudRate.Enabled = true;
                 lblStatus.Text = "串口已关闭"; lblStatus.ForeColor = Color.Gray;
@@ -187,7 +196,7 @@ namespace TempHumidityMonitor
         }
 
         // ==================== 定时器 ====================
-        private void timer1_Tick(object sender, EventArgs e) { sendData(); }
+        private void timer1_Tick(object sender, EventArgs e) { if (isReading) sendData(); }
 
         // ==================== 发送数据 ====================
         private void sendData()
@@ -253,13 +262,17 @@ namespace TempHumidityMonitor
                 cbComPort.Enabled = false; btnRefreshPorts.Enabled = false; cbBaudRate.Enabled = false;
                 if (isComOpen) closeComPort();
                 btnOpenCloseCom.Enabled = false;
-                timer1.Interval = (int)nudInterval.Value; timer1.Start();
+                timer1.Interval = (int)nudInterval.Value;
+                isReading = true; UpdateToggleButton();
+                btnToggleRead.Text = "■ 停止采集"; btnToggleRead.BackColor = Color.LightCoral;
                 tsslStatus.Text = "● 模拟模式 - 演示数据"; tsslStatus.ForeColor = Color.Orange;
                 lblStatus.Text = "模拟模式运行中"; lblStatus.ForeColor = Color.Orange;
             }
             else
             {
-                timer1.Stop(); btnOpenCloseCom.Enabled = true;
+                timer1.Stop(); isReading = false; btnOpenCloseCom.Enabled = true;
+                btnToggleRead.Enabled = false; btnToggleRead.Text = "▶ 开始采集";
+                btnToggleRead.BackColor = SystemColors.Control;
                 cbComPort.Enabled = true; btnRefreshPorts.Enabled = true; cbBaudRate.Enabled = true;
                 tsslStatus.Text = "● 串口未打开"; tsslStatus.ForeColor = Color.Gray;
                 lblStatus.Text = "就绪"; lblStatus.ForeColor = Color.Gray;
@@ -354,15 +367,15 @@ namespace TempHumidityMonitor
             UpdateChart();
             if (dataCount > 0)
             {
-                lblTempMin.Text = string.Format("最小: {0:F1}", tempMin);
-                lblTempMax.Text = string.Format("最大: {0:F1}", tempMax);
-                lblTempAvg.Text = string.Format("平均: {0:F1}", tempSum / dataCount);
-                lblHumiMin.Text = string.Format("最小: {0:F1}", humiMin);
-                lblHumiMax.Text = string.Format("最大: {0:F1}", humiMax);
-                lblHumiAvg.Text = string.Format("平均: {0:F1}", humiSum / dataCount);
-                lblPressureMin.Text = string.Format("最小: {0:F1}", pressureMin);
-                lblPressureMax.Text = string.Format("最大: {0:F1}", pressureMax);
-                lblPressureAvg.Text = string.Format("平均: {0:F1}", pressureSum / dataCount);
+                lblTempMin.Text = string.Format("{0:F1} ℃", tempMin);
+                lblTempMax.Text = string.Format("{0:F1} ℃", tempMax);
+                lblTempAvg.Text = string.Format("{0:F1} ℃", tempSum / dataCount);
+                lblHumiMin.Text = string.Format("{0:F1} %", humiMin);
+                lblHumiMax.Text = string.Format("{0:F1} %", humiMax);
+                lblHumiAvg.Text = string.Format("{0:F1} %", humiSum / dataCount);
+                lblPressureMin.Text = string.Format("{0:F1} kPa", pressureMin);
+                lblPressureMax.Text = string.Format("{0:F1} kPa", pressureMax);
+                lblPressureAvg.Text = string.Format("{0:F1} kPa", pressureSum / dataCount);
             }
         }
 
@@ -617,9 +630,9 @@ namespace TempHumidityMonitor
             humiMin = float.MaxValue; humiMax = float.MinValue;
             pressureMin = float.MaxValue; pressureMax = float.MinValue;
             tempSum = 0; humiSum = 0; pressureSum = 0;
-            lblTempMin.Text = "最小:--"; lblTempMax.Text = "最大:--"; lblTempAvg.Text = "平均:--";
-            lblHumiMin.Text = "最小:--"; lblHumiMax.Text = "最大:--"; lblHumiAvg.Text = "平均:--";
-            lblPressureMin.Text = "最小:--"; lblPressureMax.Text = "最大:--"; lblPressureAvg.Text = "平均:--";
+            lblTempMin.Text = "--.- ℃"; lblTempMax.Text = "--.- ℃"; lblTempAvg.Text = "--.- ℃";
+            lblHumiMin.Text = "--.- %"; lblHumiMax.Text = "--.- %"; lblHumiAvg.Text = "--.- %";
+            lblPressureMin.Text = "--.- kPa"; lblPressureMax.Text = "--.- kPa"; lblPressureAvg.Text = "--.- kPa";
         }
 
         // ==================== 设置变更 ====================
@@ -687,6 +700,124 @@ namespace TempHumidityMonitor
             if (this.InvokeRequired)
                 this.BeginInvoke(new Action(() => { tsslError.Text = "错误: " + nError; tsslSend.Text = "发送: " + nSend; tsslRecv.Text = "接收: " + nReceive; }));
             else { tsslError.Text = "错误: " + nError; tsslSend.Text = "发送: " + nSend; tsslRecv.Text = "接收: " + nReceive; }
+        }
+
+        // ==================== Tab 切换 ====================
+        private void btnTabCurrent_Click(object sender, EventArgs e) { SwitchTab(true); }
+        private void btnTabHistory_Click(object sender, EventArgs e) { SwitchTab(false); }
+
+        private void SwitchTab(bool isCurrent)
+        {
+            btnTabCurrent.BackColor = isCurrent ? Color.SteelBlue : SystemColors.Control;
+            btnTabCurrent.ForeColor = isCurrent ? Color.White : Color.Black;
+            btnTabHistory.BackColor = !isCurrent ? Color.SteelBlue : SystemColors.Control;
+            btnTabHistory.ForeColor = !isCurrent ? Color.White : Color.Black;
+            chart1.Visible = isCurrent;
+            gbCurrent.Visible = isCurrent;
+            gbStatsTemp.Visible = isCurrent;
+            gbStatsHumi.Visible = isCurrent;
+            gbStatsPress.Visible = isCurrent;
+            btnClearStats.Visible = isCurrent;
+            gbHistory.Visible = !isCurrent;
+        }
+
+        // ==================== 启停采集 ====================
+        private void btnToggleRead_Click(object sender, EventArgs e)
+        {
+            if (!isComOpen && !isSimMode) return;
+            isReading = !isReading;
+            if (isReading)
+            {
+                btnToggleRead.Text = "■ 停止采集";
+                btnToggleRead.BackColor = Color.LightCoral;
+                timer1.Start();
+                lblStatus.Text = "正在采集数据...";
+                lblStatus.ForeColor = Color.Green;
+            }
+            else
+            {
+                btnToggleRead.Text = "▶ 开始采集";
+                btnToggleRead.BackColor = Color.LightGreen;
+                timer1.Stop();
+                lblStatus.Text = "采集已停止";
+                lblStatus.ForeColor = Color.Gray;
+            }
+        }
+
+        private void UpdateToggleButton()
+        {
+            btnToggleRead.Enabled = (isComOpen || isSimMode);
+            if (isReading && !timer1.Enabled)
+                timer1.Start();
+        }
+
+        // ==================== 历史查询 ====================
+        private void btnQueryHistory_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var conn = new SQLiteConnection("Data Source=" + GetDbPath() + ";Version=3;"))
+                {
+                    conn.Open();
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = @"SELECT timestamp as 时间, temperature as 温度, humidity as 湿度,
+                            pressure as 气压, CASE WHEN is_simulated=1 THEN '模拟' ELSE '实时' END as 来源
+                            FROM sensor_data WHERE timestamp BETWEEN @s AND @e ORDER BY timestamp DESC LIMIT 2000";
+                        cmd.Parameters.AddWithValue("@s", dtpStart.Value.ToString("yyyy-MM-dd") + " 00:00:00");
+                        cmd.Parameters.AddWithValue("@e", dtpEnd.Value.ToString("yyyy-MM-dd") + " 23:59:59");
+                        using (var adapter = new System.Data.SQLite.SQLiteDataAdapter(cmd))
+                        {
+                            var dt = new System.Data.DataTable();
+                            adapter.Fill(dt);
+                            dgvHistory.DataSource = dt;
+                        }
+                    }
+                }
+                lblStatus.Text = string.Format("查询到 {0} 条历史记录", dgvHistory.RowCount);
+                lblStatus.ForeColor = Color.Green;
+            }
+            catch (Exception ex)
+            {
+                lblStatus.Text = "查询失败: " + ex.Message;
+                lblStatus.ForeColor = Color.Red;
+            }
+        }
+
+        private void btnExportHistory_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (dgvHistory.Rows.Count == 0) { ShowTip("没有可导出的数据"); return; }
+                using (SaveFileDialog sfd = new SaveFileDialog())
+                {
+                    sfd.Filter = "CSV文件 (*.csv)|*.csv";
+                    sfd.FileName = string.Format("历史数据_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now);
+                    if (sfd.ShowDialog() == DialogResult.OK)
+                    {
+                        using (StreamWriter sw = new StreamWriter(sfd.FileName, false, Encoding.UTF8))
+                        {
+                            for (int i = 0; i < dgvHistory.Columns.Count; i++)
+                            {
+                                sw.Write(dgvHistory.Columns[i].HeaderText);
+                                if (i < dgvHistory.Columns.Count - 1) sw.Write(",");
+                            }
+                            sw.WriteLine();
+                            foreach (DataGridViewRow row in dgvHistory.Rows)
+                            {
+                                for (int i = 0; i < dgvHistory.Columns.Count; i++)
+                                {
+                                    sw.Write(row.Cells[i].Value);
+                                    if (i < dgvHistory.Columns.Count - 1) sw.Write(",");
+                                }
+                                sw.WriteLine();
+                            }
+                        }
+                        ShowTip("已导出 " + dgvHistory.RowCount + " 条记录");
+                    }
+                }
+            }
+            catch (Exception ex) { ShowTip("导出失败: " + ex.Message); }
         }
     }
 }

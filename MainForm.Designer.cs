@@ -16,10 +16,10 @@ namespace TempHumidityMonitor
 
         // ==================== 左侧控件 ====================
         private CheckBox chkSimMode;
-        private GroupBox gbSerial, gbCollect, gbCurrent, gbStats, gbAlarm, gbData;
+        private GroupBox gbSerial, gbCollect, gbAlarm, gbData;
         private ComboBox cbComPort, cbBaudRate, cbReadMode;
         private Button btnRefreshPorts, btnOpenCloseCom, btnManualSend;
-        private Button btnClearStats, btnExportCSV, btnClearChart;
+        private Button btnExportCSV, btnClearChart;
         private CheckBox chkEnableAlarm, chkDataLog;
         private NumericUpDown nudInterval, nudMaxPoints;
         private NumericUpDown nudTempHigh, nudTempLow, nudHumiHigh, nudHumiLow;
@@ -30,8 +30,15 @@ namespace TempHumidityMonitor
         private Label lblPressureMin, lblPressureMax, lblPressureAvg;
         private Label lblStatus;
 
-        // ==================== 右侧图表 ====================
+        // ==================== 右侧控件 ====================
+        private Button btnTabCurrent, btnTabHistory;
+        private Button btnToggleRead;
         private Chart chart1;
+        private GroupBox gbCurrent, gbStatsTemp, gbStatsHumi, gbStatsPress;
+        private GroupBox gbHistory;
+        private Button btnClearStats, btnQueryHistory, btnExportHistory;
+        private DateTimePicker dtpStart, dtpEnd;
+        private DataGridView dgvHistory;
 
         // ==================== 非可视组件 ====================
         private Timer timer1;
@@ -80,10 +87,18 @@ namespace TempHumidityMonitor
             this.lblHumiValue = new System.Windows.Forms.Label();
             this.lblPressureValue = new System.Windows.Forms.Label();
             this.lblUpdateTime = new System.Windows.Forms.Label();
-            this.gbStats = new System.Windows.Forms.GroupBox();
-            this.lblStatsTemp = new System.Windows.Forms.Label();
-            this.lblStatsHumi = new System.Windows.Forms.Label();
-            this.lblStatsPress = new System.Windows.Forms.Label();
+            this.gbStatsTemp = new System.Windows.Forms.GroupBox();
+            this.gbStatsHumi = new System.Windows.Forms.GroupBox();
+            this.gbStatsPress = new System.Windows.Forms.GroupBox();
+            this.lblMinT = new System.Windows.Forms.Label();
+            this.lblMaxT = new System.Windows.Forms.Label();
+            this.lblAvgT = new System.Windows.Forms.Label();
+            this.lblMinH = new System.Windows.Forms.Label();
+            this.lblMaxH = new System.Windows.Forms.Label();
+            this.lblAvgH = new System.Windows.Forms.Label();
+            this.lblMinP = new System.Windows.Forms.Label();
+            this.lblMaxP = new System.Windows.Forms.Label();
+            this.lblAvgP = new System.Windows.Forms.Label();
             this.lblTempMin = new System.Windows.Forms.Label();
             this.lblTempMax = new System.Windows.Forms.Label();
             this.lblTempAvg = new System.Windows.Forms.Label();
@@ -113,7 +128,18 @@ namespace TempHumidityMonitor
             this.btnExportCSV = new System.Windows.Forms.Button();
             this.btnClearChart = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
+            this.btnTabCurrent = new System.Windows.Forms.Button();
+            this.btnTabHistory = new System.Windows.Forms.Button();
+            this.btnToggleRead = new System.Windows.Forms.Button();
             this.chart1 = new System.Windows.Forms.DataVisualization.Charting.Chart();
+            this.gbHistory = new System.Windows.Forms.GroupBox();
+            this.lblStart = new System.Windows.Forms.Label();
+            this.lblEnd = new System.Windows.Forms.Label();
+            this.dtpStart = new System.Windows.Forms.DateTimePicker();
+            this.dtpEnd = new System.Windows.Forms.DateTimePicker();
+            this.btnQueryHistory = new System.Windows.Forms.Button();
+            this.btnExportHistory = new System.Windows.Forms.Button();
+            this.dgvHistory = new System.Windows.Forms.DataGridView();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.tsslStatus = new System.Windows.Forms.ToolStripStatusLabel();
             this.tsslSend = new System.Windows.Forms.ToolStripStatusLabel();
@@ -131,7 +157,11 @@ namespace TempHumidityMonitor
             ((System.ComponentModel.ISupportInitialize)(this.nudInterval)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudMaxPoints)).BeginInit();
             this.gbCurrent.SuspendLayout();
-            this.gbStats.SuspendLayout();
+            this.gbStatsTemp.SuspendLayout();
+            this.gbStatsHumi.SuspendLayout();
+            this.gbStatsPress.SuspendLayout();
+            this.gbHistory.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.dgvHistory)).BeginInit();
             this.gbAlarm.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudTempHigh)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudTempLow)).BeginInit();
@@ -155,15 +185,22 @@ namespace TempHumidityMonitor
             this.splitContainer1.Panel1.Controls.Add(this.chkSimMode);
             this.splitContainer1.Panel1.Controls.Add(this.gbSerial);
             this.splitContainer1.Panel1.Controls.Add(this.gbCollect);
-            this.splitContainer1.Panel1.Controls.Add(this.gbCurrent);
-            this.splitContainer1.Panel1.Controls.Add(this.gbStats);
             this.splitContainer1.Panel1.Controls.Add(this.gbAlarm);
             this.splitContainer1.Panel1.Controls.Add(this.gbData);
             this.splitContainer1.Panel1.Controls.Add(this.lblStatus);
             // 
             // splitContainer1.Panel2
             // 
+            this.splitContainer1.Panel2.Controls.Add(this.btnTabCurrent);
+            this.splitContainer1.Panel2.Controls.Add(this.btnTabHistory);
+            this.splitContainer1.Panel2.Controls.Add(this.btnToggleRead);
             this.splitContainer1.Panel2.Controls.Add(this.chart1);
+            this.splitContainer1.Panel2.Controls.Add(this.gbCurrent);
+            this.splitContainer1.Panel2.Controls.Add(this.gbStatsTemp);
+            this.splitContainer1.Panel2.Controls.Add(this.gbStatsHumi);
+            this.splitContainer1.Panel2.Controls.Add(this.gbStatsPress);
+            this.splitContainer1.Panel2.Controls.Add(this.btnClearStats);
+            this.splitContainer1.Panel2.Controls.Add(this.gbHistory);
             this.splitContainer1.Size = new System.Drawing.Size(1222, 877);
             this.splitContainer1.SplitterDistance = 407;
             this.splitContainer1.TabIndex = 0;
@@ -185,7 +222,7 @@ namespace TempHumidityMonitor
             this.gbSerial.Controls.Add(this.cbBaudRate);
             this.gbSerial.Controls.Add(this.btnOpenCloseCom);
             this.gbSerial.Controls.Add(this.btnManualSend);
-            this.gbSerial.Location = new System.Drawing.Point(12, 34);
+            this.gbSerial.Location = new System.Drawing.Point(12, 35);
             this.gbSerial.Name = "gbSerial";
             this.gbSerial.Size = new System.Drawing.Size(280, 120);
             this.gbSerial.TabIndex = 1;
@@ -265,7 +302,7 @@ namespace TempHumidityMonitor
             this.gbCollect.Controls.Add(this.cbReadMode);
             this.gbCollect.Controls.Add(this.nudInterval);
             this.gbCollect.Controls.Add(this.nudMaxPoints);
-            this.gbCollect.Location = new System.Drawing.Point(12, 160);
+            this.gbCollect.Location = new System.Drawing.Point(12, 175);
             this.gbCollect.Name = "gbCollect";
             this.gbCollect.Size = new System.Drawing.Size(280, 105);
             this.gbCollect.TabIndex = 2;
@@ -384,229 +421,406 @@ namespace TempHumidityMonitor
             this.gbCurrent.Controls.Add(this.lblHumiValue);
             this.gbCurrent.Controls.Add(this.lblPressureValue);
             this.gbCurrent.Controls.Add(this.lblUpdateTime);
-            this.gbCurrent.Location = new System.Drawing.Point(12, 274);
+            this.gbCurrent.Location = new System.Drawing.Point(672, 86);
             this.gbCurrent.Name = "gbCurrent";
-            this.gbCurrent.Size = new System.Drawing.Size(280, 120);
+            this.gbCurrent.Size = new System.Drawing.Size(240, 200);
             this.gbCurrent.TabIndex = 3;
             this.gbCurrent.TabStop = false;
             this.gbCurrent.Text = "当前数据";
             // 
             // lblTempLabel
             // 
-            this.lblTempLabel.Location = new System.Drawing.Point(4, 16);
+            this.lblTempLabel.Location = new System.Drawing.Point(4, 24);
             this.lblTempLabel.Name = "lblTempLabel";
-            this.lblTempLabel.Size = new System.Drawing.Size(46, 22);
+            this.lblTempLabel.Size = new System.Drawing.Size(40, 32);
             this.lblTempLabel.TabIndex = 0;
             this.lblTempLabel.Text = "温度:";
             this.lblTempLabel.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             // 
             // lblHumiLabel
             // 
-            this.lblHumiLabel.Location = new System.Drawing.Point(4, 40);
+            this.lblHumiLabel.Location = new System.Drawing.Point(4, 64);
             this.lblHumiLabel.Name = "lblHumiLabel";
-            this.lblHumiLabel.Size = new System.Drawing.Size(46, 22);
+            this.lblHumiLabel.Size = new System.Drawing.Size(40, 32);
             this.lblHumiLabel.TabIndex = 1;
             this.lblHumiLabel.Text = "湿度:";
             this.lblHumiLabel.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             // 
             // lblPressureLabel
             // 
-            this.lblPressureLabel.Location = new System.Drawing.Point(4, 64);
+            this.lblPressureLabel.Location = new System.Drawing.Point(4, 104);
             this.lblPressureLabel.Name = "lblPressureLabel";
-            this.lblPressureLabel.Size = new System.Drawing.Size(46, 22);
+            this.lblPressureLabel.Size = new System.Drawing.Size(40, 32);
             this.lblPressureLabel.TabIndex = 2;
             this.lblPressureLabel.Text = "气压:";
             this.lblPressureLabel.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             // 
             // lblUpdateLabel
             // 
-            this.lblUpdateLabel.Location = new System.Drawing.Point(4, 90);
+            this.lblUpdateLabel.Location = new System.Drawing.Point(4, 150);
             this.lblUpdateLabel.Name = "lblUpdateLabel";
-            this.lblUpdateLabel.Size = new System.Drawing.Size(46, 22);
+            this.lblUpdateLabel.Size = new System.Drawing.Size(40, 26);
             this.lblUpdateLabel.TabIndex = 3;
             this.lblUpdateLabel.Text = "更新:";
             this.lblUpdateLabel.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             // 
             // lblTempValue
             // 
-            this.lblTempValue.Font = new System.Drawing.Font("微软雅黑", 11F, System.Drawing.FontStyle.Bold);
+            this.lblTempValue.Font = new System.Drawing.Font("微软雅黑", 14F, System.Drawing.FontStyle.Bold);
             this.lblTempValue.ForeColor = System.Drawing.Color.Red;
-            this.lblTempValue.Location = new System.Drawing.Point(54, 16);
+            this.lblTempValue.Location = new System.Drawing.Point(48, 22);
             this.lblTempValue.Name = "lblTempValue";
-            this.lblTempValue.Size = new System.Drawing.Size(218, 22);
+            this.lblTempValue.Size = new System.Drawing.Size(184, 34);
             this.lblTempValue.TabIndex = 4;
             this.lblTempValue.Text = "--.- ℃";
             this.lblTempValue.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // lblHumiValue
             // 
-            this.lblHumiValue.Font = new System.Drawing.Font("微软雅黑", 11F, System.Drawing.FontStyle.Bold);
+            this.lblHumiValue.Font = new System.Drawing.Font("微软雅黑", 14F, System.Drawing.FontStyle.Bold);
             this.lblHumiValue.ForeColor = System.Drawing.Color.Blue;
-            this.lblHumiValue.Location = new System.Drawing.Point(54, 40);
+            this.lblHumiValue.Location = new System.Drawing.Point(48, 62);
             this.lblHumiValue.Name = "lblHumiValue";
-            this.lblHumiValue.Size = new System.Drawing.Size(218, 22);
+            this.lblHumiValue.Size = new System.Drawing.Size(184, 34);
             this.lblHumiValue.TabIndex = 5;
             this.lblHumiValue.Text = "--.- %";
             this.lblHumiValue.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // lblPressureValue
             // 
-            this.lblPressureValue.Font = new System.Drawing.Font("微软雅黑", 11F, System.Drawing.FontStyle.Bold);
+            this.lblPressureValue.Font = new System.Drawing.Font("微软雅黑", 14F, System.Drawing.FontStyle.Bold);
             this.lblPressureValue.ForeColor = System.Drawing.Color.Green;
-            this.lblPressureValue.Location = new System.Drawing.Point(54, 64);
+            this.lblPressureValue.Location = new System.Drawing.Point(48, 102);
             this.lblPressureValue.Name = "lblPressureValue";
-            this.lblPressureValue.Size = new System.Drawing.Size(218, 22);
+            this.lblPressureValue.Size = new System.Drawing.Size(184, 34);
             this.lblPressureValue.TabIndex = 6;
             this.lblPressureValue.Text = "---.- kPa";
             this.lblPressureValue.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // lblUpdateTime
             // 
-            this.lblUpdateTime.Location = new System.Drawing.Point(54, 90);
+            this.lblUpdateTime.Location = new System.Drawing.Point(48, 150);
             this.lblUpdateTime.Name = "lblUpdateTime";
-            this.lblUpdateTime.Size = new System.Drawing.Size(218, 22);
+            this.lblUpdateTime.Size = new System.Drawing.Size(184, 26);
             this.lblUpdateTime.TabIndex = 7;
             this.lblUpdateTime.Text = "--";
             this.lblUpdateTime.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
-            // gbStats
-            // 
-            this.gbStats.Controls.Add(this.lblStatsTemp);
-            this.gbStats.Controls.Add(this.lblStatsHumi);
-            this.gbStats.Controls.Add(this.lblStatsPress);
-            this.gbStats.Controls.Add(this.lblTempMin);
-            this.gbStats.Controls.Add(this.lblTempMax);
-            this.gbStats.Controls.Add(this.lblTempAvg);
-            this.gbStats.Controls.Add(this.lblHumiMin);
-            this.gbStats.Controls.Add(this.lblHumiMax);
-            this.gbStats.Controls.Add(this.lblHumiAvg);
-            this.gbStats.Controls.Add(this.lblPressureMin);
-            this.gbStats.Controls.Add(this.lblPressureMax);
-            this.gbStats.Controls.Add(this.lblPressureAvg);
-            this.gbStats.Controls.Add(this.btnClearStats);
-            this.gbStats.Location = new System.Drawing.Point(12, 398);
-            this.gbStats.Name = "gbStats";
-            this.gbStats.Size = new System.Drawing.Size(280, 120);
-            this.gbStats.TabIndex = 4;
-            this.gbStats.TabStop = false;
-            this.gbStats.Text = "统计信息";
-            // 
-            // lblStatsTemp
-            // 
-            this.lblStatsTemp.Location = new System.Drawing.Point(4, 14);
-            this.lblStatsTemp.Name = "lblStatsTemp";
-            this.lblStatsTemp.Size = new System.Drawing.Size(42, 18);
-            this.lblStatsTemp.TabIndex = 0;
-            this.lblStatsTemp.Text = "温度:";
-            this.lblStatsTemp.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-            // 
-            // lblStatsHumi
-            // 
-            this.lblStatsHumi.Location = new System.Drawing.Point(4, 34);
-            this.lblStatsHumi.Name = "lblStatsHumi";
-            this.lblStatsHumi.Size = new System.Drawing.Size(42, 18);
-            this.lblStatsHumi.TabIndex = 1;
-            this.lblStatsHumi.Text = "湿度:";
-            this.lblStatsHumi.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-            // 
-            // lblStatsPress
-            // 
-            this.lblStatsPress.Location = new System.Drawing.Point(4, 54);
-            this.lblStatsPress.Name = "lblStatsPress";
-            this.lblStatsPress.Size = new System.Drawing.Size(42, 18);
-            this.lblStatsPress.TabIndex = 2;
-            this.lblStatsPress.Text = "气压:";
-            this.lblStatsPress.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-            // 
+            //
+            // gbStatsTemp
+            //
+            this.gbStatsTemp.Controls.Add(this.lblMinT);
+            this.gbStatsTemp.Controls.Add(this.lblTempMin);
+            this.gbStatsTemp.Controls.Add(this.lblMaxT);
+            this.gbStatsTemp.Controls.Add(this.lblTempMax);
+            this.gbStatsTemp.Controls.Add(this.lblAvgT);
+            this.gbStatsTemp.Controls.Add(this.lblTempAvg);
+            this.gbStatsTemp.Location = new System.Drawing.Point(672, 296);
+            this.gbStatsTemp.Name = "gbStatsTemp";
+            this.gbStatsTemp.Size = new System.Drawing.Size(240, 140);
+            this.gbStatsTemp.TabIndex = 4;
+            this.gbStatsTemp.TabStop = false;
+            this.gbStatsTemp.Text = "温度统计";
+            //
+            // lblMinT
+            //
+            this.lblMinT.Location = new System.Drawing.Point(4, 20);
+            this.lblMinT.Name = "lblMinT";
+            this.lblMinT.Size = new System.Drawing.Size(46, 26);
+            this.lblMinT.TabIndex = 0;
+            this.lblMinT.Text = "最小:";
+            this.lblMinT.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
             // lblTempMin
-            // 
-            this.lblTempMin.Location = new System.Drawing.Point(48, 14);
+            //
+            this.lblTempMin.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
+            this.lblTempMin.ForeColor = System.Drawing.Color.Red;
+            this.lblTempMin.Location = new System.Drawing.Point(54, 20);
             this.lblTempMin.Name = "lblTempMin";
-            this.lblTempMin.Size = new System.Drawing.Size(76, 18);
-            this.lblTempMin.TabIndex = 3;
-            this.lblTempMin.Text = "最小:--";
+            this.lblTempMin.Size = new System.Drawing.Size(178, 26);
             this.lblTempMin.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
+            this.lblTempMin.TabIndex = 1;
+            this.lblTempMin.Text = "--.- ℃";
+            //
+            // lblMaxT
+            //
+            this.lblMaxT.Location = new System.Drawing.Point(4, 54);
+            this.lblMaxT.Name = "lblMaxT";
+            this.lblMaxT.Size = new System.Drawing.Size(46, 26);
+            this.lblMaxT.TabIndex = 2;
+            this.lblMaxT.Text = "最大:";
+            this.lblMaxT.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
             // lblTempMax
-            // 
-            this.lblTempMax.Location = new System.Drawing.Point(126, 14);
+            //
+            this.lblTempMax.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
+            this.lblTempMax.ForeColor = System.Drawing.Color.Red;
+            this.lblTempMax.Location = new System.Drawing.Point(54, 54);
             this.lblTempMax.Name = "lblTempMax";
-            this.lblTempMax.Size = new System.Drawing.Size(76, 18);
-            this.lblTempMax.TabIndex = 4;
-            this.lblTempMax.Text = "最大:--";
+            this.lblTempMax.Size = new System.Drawing.Size(178, 26);
             this.lblTempMax.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
+            this.lblTempMax.TabIndex = 3;
+            this.lblTempMax.Text = "--.- ℃";
+            //
+            // lblAvgT
+            //
+            this.lblAvgT.Location = new System.Drawing.Point(4, 88);
+            this.lblAvgT.Name = "lblAvgT";
+            this.lblAvgT.Size = new System.Drawing.Size(46, 26);
+            this.lblAvgT.TabIndex = 4;
+            this.lblAvgT.Text = "平均:";
+            this.lblAvgT.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
             // lblTempAvg
-            // 
-            this.lblTempAvg.Location = new System.Drawing.Point(204, 14);
+            //
+            this.lblTempAvg.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
+            this.lblTempAvg.ForeColor = System.Drawing.Color.Red;
+            this.lblTempAvg.Location = new System.Drawing.Point(54, 88);
             this.lblTempAvg.Name = "lblTempAvg";
-            this.lblTempAvg.Size = new System.Drawing.Size(72, 18);
-            this.lblTempAvg.TabIndex = 5;
-            this.lblTempAvg.Text = "平均:--";
+            this.lblTempAvg.Size = new System.Drawing.Size(178, 26);
             this.lblTempAvg.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
+            this.lblTempAvg.TabIndex = 5;
+            this.lblTempAvg.Text = "--.- ℃";
+            //
+            // gbStatsHumi
+            //
+            this.gbStatsHumi.Controls.Add(this.lblMinH);
+            this.gbStatsHumi.Controls.Add(this.lblHumiMin);
+            this.gbStatsHumi.Controls.Add(this.lblMaxH);
+            this.gbStatsHumi.Controls.Add(this.lblHumiMax);
+            this.gbStatsHumi.Controls.Add(this.lblAvgH);
+            this.gbStatsHumi.Controls.Add(this.lblHumiAvg);
+            this.gbStatsHumi.Location = new System.Drawing.Point(672, 450);
+            this.gbStatsHumi.Name = "gbStatsHumi";
+            this.gbStatsHumi.Size = new System.Drawing.Size(240, 140);
+            this.gbStatsHumi.TabIndex = 5;
+            this.gbStatsHumi.TabStop = false;
+            this.gbStatsHumi.Text = "湿度统计";
+            //
+            // lblMinH
+            //
+            this.lblMinH.Location = new System.Drawing.Point(4, 20);
+            this.lblMinH.Name = "lblMinH";
+            this.lblMinH.Size = new System.Drawing.Size(46, 26);
+            this.lblMinH.TabIndex = 0;
+            this.lblMinH.Text = "最小:";
+            this.lblMinH.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
             // lblHumiMin
-            // 
-            this.lblHumiMin.Location = new System.Drawing.Point(48, 34);
+            //
+            this.lblHumiMin.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
+            this.lblHumiMin.ForeColor = System.Drawing.Color.Blue;
+            this.lblHumiMin.Location = new System.Drawing.Point(54, 20);
             this.lblHumiMin.Name = "lblHumiMin";
-            this.lblHumiMin.Size = new System.Drawing.Size(76, 18);
-            this.lblHumiMin.TabIndex = 6;
-            this.lblHumiMin.Text = "最小:--";
+            this.lblHumiMin.Size = new System.Drawing.Size(178, 26);
             this.lblHumiMin.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
+            this.lblHumiMin.TabIndex = 1;
+            this.lblHumiMin.Text = "--.- %";
+            //
+            // lblMaxH
+            //
+            this.lblMaxH.Location = new System.Drawing.Point(4, 54);
+            this.lblMaxH.Name = "lblMaxH";
+            this.lblMaxH.Size = new System.Drawing.Size(46, 26);
+            this.lblMaxH.TabIndex = 2;
+            this.lblMaxH.Text = "最大:";
+            this.lblMaxH.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
             // lblHumiMax
-            // 
-            this.lblHumiMax.Location = new System.Drawing.Point(126, 34);
+            //
+            this.lblHumiMax.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
+            this.lblHumiMax.ForeColor = System.Drawing.Color.Blue;
+            this.lblHumiMax.Location = new System.Drawing.Point(54, 54);
             this.lblHumiMax.Name = "lblHumiMax";
-            this.lblHumiMax.Size = new System.Drawing.Size(76, 18);
-            this.lblHumiMax.TabIndex = 7;
-            this.lblHumiMax.Text = "最大:--";
+            this.lblHumiMax.Size = new System.Drawing.Size(178, 26);
             this.lblHumiMax.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
+            this.lblHumiMax.TabIndex = 3;
+            this.lblHumiMax.Text = "--.- %";
+            //
+            // lblAvgH
+            //
+            this.lblAvgH.Location = new System.Drawing.Point(4, 88);
+            this.lblAvgH.Name = "lblAvgH";
+            this.lblAvgH.Size = new System.Drawing.Size(46, 26);
+            this.lblAvgH.TabIndex = 4;
+            this.lblAvgH.Text = "平均:";
+            this.lblAvgH.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
             // lblHumiAvg
-            // 
-            this.lblHumiAvg.Location = new System.Drawing.Point(204, 34);
+            //
+            this.lblHumiAvg.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
+            this.lblHumiAvg.ForeColor = System.Drawing.Color.Blue;
+            this.lblHumiAvg.Location = new System.Drawing.Point(54, 88);
             this.lblHumiAvg.Name = "lblHumiAvg";
-            this.lblHumiAvg.Size = new System.Drawing.Size(72, 18);
-            this.lblHumiAvg.TabIndex = 8;
-            this.lblHumiAvg.Text = "平均:--";
+            this.lblHumiAvg.Size = new System.Drawing.Size(178, 26);
             this.lblHumiAvg.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
+            this.lblHumiAvg.TabIndex = 5;
+            this.lblHumiAvg.Text = "--.- %";
+            //
+            // gbStatsPress
+            //
+            this.gbStatsPress.Controls.Add(this.lblMinP);
+            this.gbStatsPress.Controls.Add(this.lblPressureMin);
+            this.gbStatsPress.Controls.Add(this.lblMaxP);
+            this.gbStatsPress.Controls.Add(this.lblPressureMax);
+            this.gbStatsPress.Controls.Add(this.lblAvgP);
+            this.gbStatsPress.Controls.Add(this.lblPressureAvg);
+            this.gbStatsPress.Location = new System.Drawing.Point(672, 604);
+            this.gbStatsPress.Name = "gbStatsPress";
+            this.gbStatsPress.Size = new System.Drawing.Size(240, 140);
+            this.gbStatsPress.TabIndex = 6;
+            this.gbStatsPress.TabStop = false;
+            this.gbStatsPress.Text = "气压统计";
+            //
+            // lblMinP
+            //
+            this.lblMinP.Location = new System.Drawing.Point(4, 20);
+            this.lblMinP.Name = "lblMinP";
+            this.lblMinP.Size = new System.Drawing.Size(46, 26);
+            this.lblMinP.TabIndex = 0;
+            this.lblMinP.Text = "最小:";
+            this.lblMinP.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
             // lblPressureMin
-            // 
-            this.lblPressureMin.Location = new System.Drawing.Point(48, 54);
+            //
+            this.lblPressureMin.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
+            this.lblPressureMin.ForeColor = System.Drawing.Color.Green;
+            this.lblPressureMin.Location = new System.Drawing.Point(54, 20);
             this.lblPressureMin.Name = "lblPressureMin";
-            this.lblPressureMin.Size = new System.Drawing.Size(76, 18);
-            this.lblPressureMin.TabIndex = 9;
-            this.lblPressureMin.Text = "最小:--";
+            this.lblPressureMin.Size = new System.Drawing.Size(178, 26);
             this.lblPressureMin.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
+            this.lblPressureMin.TabIndex = 1;
+            this.lblPressureMin.Text = "--.- kPa";
+            //
+            // lblMaxP
+            //
+            this.lblMaxP.Location = new System.Drawing.Point(4, 54);
+            this.lblMaxP.Name = "lblMaxP";
+            this.lblMaxP.Size = new System.Drawing.Size(46, 26);
+            this.lblMaxP.TabIndex = 2;
+            this.lblMaxP.Text = "最大:";
+            this.lblMaxP.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
             // lblPressureMax
-            // 
-            this.lblPressureMax.Location = new System.Drawing.Point(126, 54);
+            //
+            this.lblPressureMax.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
+            this.lblPressureMax.ForeColor = System.Drawing.Color.Green;
+            this.lblPressureMax.Location = new System.Drawing.Point(54, 54);
             this.lblPressureMax.Name = "lblPressureMax";
-            this.lblPressureMax.Size = new System.Drawing.Size(76, 18);
-            this.lblPressureMax.TabIndex = 10;
-            this.lblPressureMax.Text = "最大:--";
+            this.lblPressureMax.Size = new System.Drawing.Size(178, 26);
             this.lblPressureMax.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
+            this.lblPressureMax.TabIndex = 3;
+            this.lblPressureMax.Text = "--.- kPa";
+            //
+            // lblAvgP
+            //
+            this.lblAvgP.Location = new System.Drawing.Point(4, 88);
+            this.lblAvgP.Name = "lblAvgP";
+            this.lblAvgP.Size = new System.Drawing.Size(46, 26);
+            this.lblAvgP.TabIndex = 4;
+            this.lblAvgP.Text = "平均:";
+            this.lblAvgP.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
             // lblPressureAvg
-            // 
-            this.lblPressureAvg.Location = new System.Drawing.Point(204, 54);
+            //
+            this.lblPressureAvg.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
+            this.lblPressureAvg.ForeColor = System.Drawing.Color.Green;
+            this.lblPressureAvg.Location = new System.Drawing.Point(54, 88);
             this.lblPressureAvg.Name = "lblPressureAvg";
-            this.lblPressureAvg.Size = new System.Drawing.Size(72, 18);
-            this.lblPressureAvg.TabIndex = 11;
-            this.lblPressureAvg.Text = "平均:--";
+            this.lblPressureAvg.Size = new System.Drawing.Size(178, 26);
             this.lblPressureAvg.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
+            this.lblPressureAvg.TabIndex = 5;
+            this.lblPressureAvg.Text = "--.- kPa";
+            //
             // btnClearStats
-            // 
-            this.btnClearStats.Location = new System.Drawing.Point(80, 80);
+            //
+            this.btnClearStats.Location = new System.Drawing.Point(672, 758);
             this.btnClearStats.Name = "btnClearStats";
-            this.btnClearStats.Size = new System.Drawing.Size(120, 27);
-            this.btnClearStats.TabIndex = 12;
+            this.btnClearStats.Size = new System.Drawing.Size(240, 35);
+            this.btnClearStats.TabIndex = 7;
             this.btnClearStats.Text = "重置统计";
-            // 
+            //
+            // gbHistory
+            //
+            this.gbHistory.Controls.Add(this.lblStart);
+            this.gbHistory.Controls.Add(this.dtpStart);
+            this.gbHistory.Controls.Add(this.lblEnd);
+            this.gbHistory.Controls.Add(this.dtpEnd);
+            this.gbHistory.Controls.Add(this.btnQueryHistory);
+            this.gbHistory.Controls.Add(this.btnExportHistory);
+            this.gbHistory.Controls.Add(this.dgvHistory);
+            this.gbHistory.Location = new System.Drawing.Point(4, 80);
+            this.gbHistory.Name = "gbHistory";
+            this.gbHistory.Size = new System.Drawing.Size(910, 790);
+            this.gbHistory.TabIndex = 13;
+            this.gbHistory.TabStop = false;
+            this.gbHistory.Text = "历史数据查询";
+            this.gbHistory.Visible = false;
+            //
+            // lblStart
+            //
+            this.lblStart.Location = new System.Drawing.Point(10, 25);
+            this.lblStart.Name = "lblStart";
+            this.lblStart.Size = new System.Drawing.Size(70, 22);
+            this.lblStart.TabIndex = 0;
+            this.lblStart.Text = "开始日期:";
+            this.lblStart.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
+            // dtpStart
+            //
+            this.dtpStart.Format = System.Windows.Forms.DateTimePickerFormat.Short;
+            this.dtpStart.Location = new System.Drawing.Point(84, 22);
+            this.dtpStart.Name = "dtpStart";
+            this.dtpStart.Size = new System.Drawing.Size(150, 25);
+            this.dtpStart.TabIndex = 1;
+            //
+            // lblEnd
+            //
+            this.lblEnd.Location = new System.Drawing.Point(244, 25);
+            this.lblEnd.Name = "lblEnd";
+            this.lblEnd.Size = new System.Drawing.Size(70, 22);
+            this.lblEnd.TabIndex = 2;
+            this.lblEnd.Text = "结束日期:";
+            this.lblEnd.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
+            // dtpEnd
+            //
+            this.dtpEnd.Format = System.Windows.Forms.DateTimePickerFormat.Short;
+            this.dtpEnd.Location = new System.Drawing.Point(318, 22);
+            this.dtpEnd.Name = "dtpEnd";
+            this.dtpEnd.Size = new System.Drawing.Size(150, 25);
+            this.dtpEnd.TabIndex = 3;
+            //
+            // btnQueryHistory
+            //
+            this.btnQueryHistory.Location = new System.Drawing.Point(476, 20);
+            this.btnQueryHistory.Name = "btnQueryHistory";
+            this.btnQueryHistory.Size = new System.Drawing.Size(80, 28);
+            this.btnQueryHistory.TabIndex = 4;
+            this.btnQueryHistory.Text = "查询";
+            this.btnQueryHistory.UseVisualStyleBackColor = true;
+            //
+            // btnExportHistory
+            //
+            this.btnExportHistory.Location = new System.Drawing.Point(562, 20);
+            this.btnExportHistory.Name = "btnExportHistory";
+            this.btnExportHistory.Size = new System.Drawing.Size(80, 28);
+            this.btnExportHistory.TabIndex = 5;
+            this.btnExportHistory.Text = "导出CSV";
+            this.btnExportHistory.UseVisualStyleBackColor = true;
+            //
+            // dgvHistory
+            //
+            this.dgvHistory.AllowUserToAddRows = false;
+            this.dgvHistory.AllowUserToDeleteRows = false;
+            this.dgvHistory.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
+            this.dgvHistory.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dgvHistory.Location = new System.Drawing.Point(10, 56);
+            this.dgvHistory.Name = "dgvHistory";
+            this.dgvHistory.ReadOnly = true;
+            this.dgvHistory.RowHeadersVisible = false;
+            this.dgvHistory.Size = new System.Drawing.Size(890, 724);
+            this.dgvHistory.TabIndex = 6;
+            //
             // gbAlarm
             // 
             this.gbAlarm.Controls.Add(this.lblTempHigh);
@@ -622,16 +836,16 @@ namespace TempHumidityMonitor
             this.gbAlarm.Controls.Add(this.nudHumiLow);
             this.gbAlarm.Controls.Add(this.nudPressureHigh);
             this.gbAlarm.Controls.Add(this.nudPressureLow);
-            this.gbAlarm.Location = new System.Drawing.Point(12, 525);
+            this.gbAlarm.Location = new System.Drawing.Point(12, 310);
             this.gbAlarm.Name = "gbAlarm";
-            this.gbAlarm.Size = new System.Drawing.Size(280, 196);
+            this.gbAlarm.Size = new System.Drawing.Size(280, 320);
             this.gbAlarm.TabIndex = 5;
             this.gbAlarm.TabStop = false;
             this.gbAlarm.Text = "报警设置";
             // 
             // lblTempHigh
             // 
-            this.lblTempHigh.Location = new System.Drawing.Point(4, 44);
+            this.lblTempHigh.Location = new System.Drawing.Point(4, 58);
             this.lblTempHigh.Name = "lblTempHigh";
             this.lblTempHigh.Size = new System.Drawing.Size(60, 22);
             this.lblTempHigh.TabIndex = 0;
@@ -640,7 +854,7 @@ namespace TempHumidityMonitor
             // 
             // lblTempLow
             // 
-            this.lblTempLow.Location = new System.Drawing.Point(4, 68);
+            this.lblTempLow.Location = new System.Drawing.Point(4, 98);
             this.lblTempLow.Name = "lblTempLow";
             this.lblTempLow.Size = new System.Drawing.Size(60, 22);
             this.lblTempLow.TabIndex = 1;
@@ -649,7 +863,7 @@ namespace TempHumidityMonitor
             // 
             // lblHumiHigh
             // 
-            this.lblHumiHigh.Location = new System.Drawing.Point(4, 92);
+            this.lblHumiHigh.Location = new System.Drawing.Point(4, 138);
             this.lblHumiHigh.Name = "lblHumiHigh";
             this.lblHumiHigh.Size = new System.Drawing.Size(60, 22);
             this.lblHumiHigh.TabIndex = 2;
@@ -658,7 +872,7 @@ namespace TempHumidityMonitor
             // 
             // lblHumiLow
             // 
-            this.lblHumiLow.Location = new System.Drawing.Point(4, 116);
+            this.lblHumiLow.Location = new System.Drawing.Point(4, 178);
             this.lblHumiLow.Name = "lblHumiLow";
             this.lblHumiLow.Size = new System.Drawing.Size(60, 22);
             this.lblHumiLow.TabIndex = 3;
@@ -667,7 +881,7 @@ namespace TempHumidityMonitor
             // 
             // lblPressHigh
             // 
-            this.lblPressHigh.Location = new System.Drawing.Point(4, 140);
+            this.lblPressHigh.Location = new System.Drawing.Point(4, 218);
             this.lblPressHigh.Name = "lblPressHigh";
             this.lblPressHigh.Size = new System.Drawing.Size(60, 22);
             this.lblPressHigh.TabIndex = 4;
@@ -676,7 +890,7 @@ namespace TempHumidityMonitor
             // 
             // lblPressLow
             // 
-            this.lblPressLow.Location = new System.Drawing.Point(4, 164);
+            this.lblPressLow.Location = new System.Drawing.Point(4, 258);
             this.lblPressLow.Name = "lblPressLow";
             this.lblPressLow.Size = new System.Drawing.Size(60, 22);
             this.lblPressLow.TabIndex = 5;
@@ -699,7 +913,7 @@ namespace TempHumidityMonitor
             0,
             0,
             65536});
-            this.nudTempHigh.Location = new System.Drawing.Point(68, 44);
+            this.nudTempHigh.Location = new System.Drawing.Point(68, 58);
             this.nudTempHigh.Maximum = new decimal(new int[] {
             150,
             0,
@@ -728,7 +942,7 @@ namespace TempHumidityMonitor
             0,
             0,
             65536});
-            this.nudTempLow.Location = new System.Drawing.Point(68, 68);
+            this.nudTempLow.Location = new System.Drawing.Point(68, 98);
             this.nudTempLow.Maximum = new decimal(new int[] {
             150,
             0,
@@ -746,7 +960,7 @@ namespace TempHumidityMonitor
             // 
             // nudHumiHigh
             // 
-            this.nudHumiHigh.Location = new System.Drawing.Point(68, 92);
+            this.nudHumiHigh.Location = new System.Drawing.Point(68, 138);
             this.nudHumiHigh.Name = "nudHumiHigh";
             this.nudHumiHigh.Size = new System.Drawing.Size(202, 25);
             this.nudHumiHigh.TabIndex = 9;
@@ -759,7 +973,7 @@ namespace TempHumidityMonitor
             // 
             // nudHumiLow
             // 
-            this.nudHumiLow.Location = new System.Drawing.Point(68, 116);
+            this.nudHumiLow.Location = new System.Drawing.Point(68, 178);
             this.nudHumiLow.Name = "nudHumiLow";
             this.nudHumiLow.Size = new System.Drawing.Size(202, 25);
             this.nudHumiLow.TabIndex = 10;
@@ -772,7 +986,7 @@ namespace TempHumidityMonitor
             // 
             // nudPressureHigh
             // 
-            this.nudPressureHigh.Location = new System.Drawing.Point(68, 140);
+            this.nudPressureHigh.Location = new System.Drawing.Point(68, 218);
             this.nudPressureHigh.Maximum = new decimal(new int[] {
             200,
             0,
@@ -795,7 +1009,7 @@ namespace TempHumidityMonitor
             // 
             // nudPressureLow
             // 
-            this.nudPressureLow.Location = new System.Drawing.Point(68, 164);
+            this.nudPressureLow.Location = new System.Drawing.Point(68, 258);
             this.nudPressureLow.Maximum = new decimal(new int[] {
             200,
             0,
@@ -821,7 +1035,7 @@ namespace TempHumidityMonitor
             this.gbData.Controls.Add(this.chkDataLog);
             this.gbData.Controls.Add(this.btnExportCSV);
             this.gbData.Controls.Add(this.btnClearChart);
-            this.gbData.Location = new System.Drawing.Point(12, 722);
+            this.gbData.Location = new System.Drawing.Point(12, 660);
             this.gbData.Name = "gbData";
             this.gbData.Size = new System.Drawing.Size(280, 105);
             this.gbData.TabIndex = 6;
@@ -856,14 +1070,47 @@ namespace TempHumidityMonitor
             // 
             // lblStatus
             // 
-            this.lblStatus.Location = new System.Drawing.Point(12, 838);
+            this.lblStatus.Location = new System.Drawing.Point(12, 778);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(280, 40);
             this.lblStatus.TabIndex = 7;
             this.lblStatus.Text = "就绪";
             // 
+            //
+            // btnTabCurrent
+            //
+            this.btnTabCurrent.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnTabCurrent.Location = new System.Drawing.Point(4, 6);
+            this.btnTabCurrent.Name = "btnTabCurrent";
+            this.btnTabCurrent.Size = new System.Drawing.Size(100, 28);
+            this.btnTabCurrent.TabIndex = 10;
+            this.btnTabCurrent.Text = "当前数据";
+            this.btnTabCurrent.UseVisualStyleBackColor = true;
+            //
+            // btnTabHistory
+            //
+            this.btnTabHistory.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnTabHistory.Location = new System.Drawing.Point(108, 6);
+            this.btnTabHistory.Name = "btnTabHistory";
+            this.btnTabHistory.Size = new System.Drawing.Size(100, 28);
+            this.btnTabHistory.TabIndex = 11;
+            this.btnTabHistory.Text = "历史查询";
+            this.btnTabHistory.UseVisualStyleBackColor = true;
+            //
+            // btnToggleRead
+            //
+            this.btnToggleRead.Enabled = false;
+            this.btnToggleRead.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnToggleRead.Font = new System.Drawing.Font("微软雅黑", 9F, System.Drawing.FontStyle.Bold);
+            this.btnToggleRead.Location = new System.Drawing.Point(4, 40);
+            this.btnToggleRead.Name = "btnToggleRead";
+            this.btnToggleRead.Size = new System.Drawing.Size(140, 30);
+            this.btnToggleRead.TabIndex = 12;
+            this.btnToggleRead.Text = "▶ 开始采集";
+            this.btnToggleRead.UseVisualStyleBackColor = true;
+            //
             // chart1
-            // 
+            //
             chartArea1.AxisX.MajorGrid.LineColor = System.Drawing.Color.LightGray;
             chartArea1.AxisX.Title = "采样点序号";
             chartArea1.AxisX.TitleFont = new System.Drawing.Font("微软雅黑", 9F);
@@ -877,13 +1124,13 @@ namespace TempHumidityMonitor
             chartArea1.CursorX.IsUserSelectionEnabled = true;
             chartArea1.Name = "MainArea";
             this.chart1.ChartAreas.Add(chartArea1);
-            this.chart1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.chart1.Dock = System.Windows.Forms.DockStyle.None;
             legend1.Docking = System.Windows.Forms.DataVisualization.Charting.Docking.Top;
             legend1.Font = new System.Drawing.Font("微软雅黑", 9F);
             legend1.IsTextAutoFit = false;
             legend1.Name = "Legend";
             this.chart1.Legends.Add(legend1);
-            this.chart1.Location = new System.Drawing.Point(0, 0);
+            this.chart1.Location = new System.Drawing.Point(0, 80);
             this.chart1.Name = "chart1";
             series1.BorderWidth = 2;
             series1.ChartArea = "MainArea";
@@ -918,7 +1165,7 @@ namespace TempHumidityMonitor
             this.chart1.Series.Add(series1);
             this.chart1.Series.Add(series2);
             this.chart1.Series.Add(series3);
-            this.chart1.Size = new System.Drawing.Size(811, 877);
+            this.chart1.Size = new System.Drawing.Size(665, 797);
             this.chart1.TabIndex = 0;
             // 
             // statusStrip1
@@ -987,7 +1234,11 @@ namespace TempHumidityMonitor
             ((System.ComponentModel.ISupportInitialize)(this.nudInterval)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudMaxPoints)).EndInit();
             this.gbCurrent.ResumeLayout(false);
-            this.gbStats.ResumeLayout(false);
+            this.gbStatsTemp.ResumeLayout(false);
+            this.gbStatsHumi.ResumeLayout(false);
+            this.gbStatsPress.ResumeLayout(false);
+            this.gbHistory.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.dgvHistory)).EndInit();
             this.gbAlarm.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.nudTempHigh)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudTempLow)).EndInit();
@@ -1026,6 +1277,11 @@ namespace TempHumidityMonitor
             this.timer1.Tick += timer1_Tick;
             this.serialPort1.DataReceived += serialPort1_DataReceived;
             this.serialPort1.ErrorReceived += serialPort1_ErrorReceived;
+            this.btnTabCurrent.Click += btnTabCurrent_Click;
+            this.btnTabHistory.Click += btnTabHistory_Click;
+            this.btnToggleRead.Click += btnToggleRead_Click;
+            this.btnQueryHistory.Click += btnQueryHistory_Click;
+            this.btnExportHistory.Click += btnExportHistory_Click;
 
         }
 
@@ -1038,14 +1294,16 @@ namespace TempHumidityMonitor
         private Label lblHumiLabel;
         private Label lblPressureLabel;
         private Label lblUpdateLabel;
-        private Label lblStatsTemp;
-        private Label lblStatsHumi;
-        private Label lblStatsPress;
         private Label lblTempHigh;
         private Label lblTempLow;
         private Label lblHumiHigh;
         private Label lblHumiLow;
         private Label lblPressHigh;
         private Label lblPressLow;
+        private Label lblStart;
+        private Label lblEnd;
+        private Label lblMinT, lblMaxT, lblAvgT;
+        private Label lblMinH, lblMaxH, lblAvgH;
+        private Label lblMinP, lblMaxP, lblAvgP;
     }
 }
