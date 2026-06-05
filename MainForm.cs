@@ -9,6 +9,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.Windows.Forms.DataVisualization.Charting;
 using TempHumidityMonitor.Properties;
+using TempHumidityMonitor.Services;
 
 namespace TempHumidityMonitor
 {
@@ -24,7 +25,6 @@ namespace TempHumidityMonitor
         private float pressureMin = float.MaxValue, pressureMax = float.MinValue, pressureSum = 0;
         private int dataCount = 0;
         private List<byte> receiveBuffer = new List<byte>();
-        private string logFilePath;
         private bool isComOpen = false;
         private bool isSimMode = false;
         private DateTime lastReceiveTime = DateTime.MinValue;
@@ -45,6 +45,8 @@ namespace TempHumidityMonitor
         private bool isReconnecting = false;
         private int connectVersion = 0;
         private Timer reconnectTimer;
+        private DatabaseService dbService;
+        private LogService logService;
 
         // ==================== 构造函数 ====================
         public MainForm()
@@ -131,8 +133,13 @@ namespace TempHumidityMonitor
             catch { }
 
             InitLogFile();
-            LoadModbusConfig();
-            try { CleanOldData((int)nudRetainDays.Value); } catch { }
+            string configPath = Path.Combine(Application.StartupPath, "modbus_config.json");
+            if (!File.Exists(configPath))
+                configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\modbus_config.json");
+            ModbusService.LoadConfig(configPath);
+            dbService = new DatabaseService(GetDbPath());
+            logService = new LogService(Application.StartupPath);
+            try { dbService.CleanOldData((int)nudRetainDays.Value); } catch { }
             dtpStart.Value = DateTime.Today;
             dtpEnd.Value = DateTime.Now;
             SwitchTab(true);
@@ -224,7 +231,7 @@ namespace TempHumidityMonitor
             {
                 if (isSimMode) { SimulateData(); return; }
                 if (!isComOpen || !serialPort1.IsOpen) return;
-                byte[] cmd = GetModbusCommand();
+                byte[] cmd = ModbusService.GetCommand(readModeIndex);
                 serialPort1.Write(cmd, 0, cmd.Length);
                 nSend++; tsslSend.Text = "发送: " + nSend;
             }
@@ -236,55 +243,6 @@ namespace TempHumidityMonitor
             }
         }
 
-        private Dictionary<int, byte[]> modbusCommands;
-
-        private void LoadModbusConfig()
-        {
-            modbusCommands = new Dictionary<int, byte[]>();
-            string path = Path.Combine(Application.StartupPath, "modbus_config.json");
-            if (!File.Exists(path))
-                path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\modbus_config.json");
-            try
-            {
-                if (File.Exists(path))
-                {
-                    string[] lines = File.ReadAllLines(path, Encoding.UTF8);
-                    int idx = -1;
-                    foreach (string line in lines)
-                    {
-                        if (line.Contains("\"index\""))
-                            int.TryParse(System.Text.RegularExpressions.Regex.Match(line, @"\d+").Value, out idx);
-                        else if (idx >= 0 && line.Contains("\"bytes\""))
-                        {
-                            string hex = System.Text.RegularExpressions.Regex.Match(line, @"[0-9A-Fa-f, ]+").Value;
-                            var bytes = hex.Split(',').Select(s => byte.Parse(s.Trim(), System.Globalization.NumberStyles.HexNumber)).ToArray();
-                            modbusCommands[idx] = bytes;
-                            idx = -1;
-                        }
-                    }
-                }
-            }
-            catch { }
-            if (modbusCommands.Count == 0)
-            {
-                modbusCommands[0] = new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x04, 0x44, 0x09 };
-                modbusCommands[1] = new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x04, 0x45, 0xE1 };
-                modbusCommands[2] = new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x02, 0xC4, 0x0B };
-                modbusCommands[3] = new byte[] { 0x01, 0x03, 0x00, 0x02, 0x00, 0x02, 0x65, 0xCB };
-                modbusCommands[4] = new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x01, 0x85, 0xE2 };
-                modbusCommands[5] = new byte[] { 0x01, 0x03, 0x00, 0x81, 0x00, 0x01, 0xD4, 0x22 };
-                modbusCommands[6] = new byte[] { 0x01, 0x03, 0x00, 0x04, 0x00, 0x02, 0x85, 0xCA };
-                modbusCommands[7] = new byte[] { 0x01, 0x03, 0x00, 0x82, 0x00, 0x01, 0x24, 0x22 };
-                modbusCommands[8] = new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x06, 0xC5, 0xC8 };
-                modbusCommands[9] = new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x04, 0x45, 0xE1 };
-            }
-        }
-
-        private byte[] GetModbusCommand()
-        {
-            if (modbusCommands.TryGetValue(readModeIndex, out var cmd)) return cmd;
-            return modbusCommands[0];
-        }
 
         private void SimulateData()
         {
@@ -439,14 +397,15 @@ namespace TempHumidityMonitor
             this.BeginInvoke(new Action(() => { tsslRecv.Text = "接收: " + nReceive; }));
             try
             {
-                if (!checkData(buffer))
+                if (!ModbusService.CheckFrame(buffer))
                 {
                     nError++;
                     this.BeginInvoke(new Action(() => { tsslError.Text = "错误: " + nError; }));
                     return;
                 }
-                float t, h, p;
-                getSensorData(buffer, out t, out h, out p);
+                var data = ModbusService.ParseSensorData(buffer, readModeIndex, lastTemp, lastHumi, lastPressure);
+                float t = data.Temperature, h = data.Humidity, p = data.Pressure;
+                lastTemp = t; lastHumi = h; lastPressure = p;
                 if (t < -40 || t > 125 || h < 0 || h > 100 || p < 50 || p > 200)
                 { LogError(string.Format("数据超范围: T={0:F1} H={1:F1} P={2:F1}", t, h, p)); return; }
                 AddDataPoint(t, h, p);
@@ -533,79 +492,6 @@ namespace TempHumidityMonitor
             }
         }
 
-        // ==================== 数据解析 ====================
-        private void getSensorData(byte[] buf, out float t, out float h, out float p)
-        {
-            t = lastTemp; h = lastHumi; p = lastPressure;
-            switch (readModeIndex)
-            {
-                case 0: // 温湿浮点
-                    { byte[] a = { buf[6], buf[5], buf[4], buf[3] }, b = { buf[10], buf[9], buf[8], buf[7] }; t = BitConverter.ToSingle(a, 0); h = BitConverter.ToSingle(b, 0); }
-                    break;
-                case 1: // 温湿整型
-                    { t = ((buf[3] << 8) | buf[4]) / 10.0f; h = ((buf[5] << 8) | buf[6]) / 10.0f; }
-                    break;
-                case 2: // 温度浮点
-                    { byte[] a = { buf[6], buf[5], buf[4], buf[3] }; t = BitConverter.ToSingle(a, 0); }
-                    break;
-                case 3: // 湿度浮点
-                    { byte[] b = { buf[6], buf[5], buf[4], buf[3] }; h = BitConverter.ToSingle(b, 0); }
-                    break;
-                case 4: // 温度整型
-                    { t = ((buf[3] << 8) | buf[4]) / 10.0f; }
-                    break;
-                case 5: // 湿度整型
-                    { h = ((buf[3] << 8) | buf[4]) / 10.0f; }
-                    break;
-                case 6: // 气压浮点
-                    { byte[] c = { buf[6], buf[5], buf[4], buf[3] }; p = BitConverter.ToSingle(c, 0); }
-                    break;
-                case 7: // 气压整型
-                    { p = ((buf[3] << 8) | buf[4]); }
-                    break;
-                case 8: // 温湿压浮点
-                    { byte[] a = { buf[6], buf[5], buf[4], buf[3] }, b = { buf[10], buf[9], buf[8], buf[7] }, c = { buf[14], buf[13], buf[12], buf[11] }; t = BitConverter.ToSingle(a, 0); h = BitConverter.ToSingle(b, 0); p = BitConverter.ToSingle(c, 0); }
-                    break;
-                case 9: // 温湿压整型
-                    { t = ((buf[3] << 8) | buf[4]) / 10.0f; h = ((buf[5] << 8) | buf[6]) / 10.0f; p = ((buf[7] << 8) | buf[8]); }
-                    break;
-            }
-            lastTemp = t; lastHumi = h; lastPressure = p;
-        }
-
-        private bool checkData(byte[] buf)
-        {
-            if (buf == null || buf.Length < 5) return false;
-            if (buf[0] != 0x01 || buf[1] != 0x03) return false;
-            if (buf.Length != buf[2] + 5) return false;
-            return checkCRC(buf);
-        }
-
-        private bool checkCRC(byte[] buf)
-        {
-            if (buf.Length < 2) return false;
-            byte[] d = new byte[buf.Length - 2];
-            Array.Copy(buf, d, d.Length);
-            byte[] c = calcCRC(d);
-            return c[0] == buf[buf.Length - 2] && c[1] == buf[buf.Length - 1];
-        }
-
-        private byte[] calcCRC(byte[] p)
-        {
-            uint crc = 0xffff;
-            for (int i = 0; i < p.Length; i++)
-            {
-                crc ^= (uint)p[i] & 0x00ff;
-                for (int j = 0; j < 8; j++)
-                {
-                    uint flag = crc & 0x01;
-                    crc >>= 1;
-                    if (flag != 0) crc ^= 0xA001;
-                }
-            }
-            return BitConverter.GetBytes(crc);
-        }
-
         // ==================== 报警 ====================
         private void CheckAlarm(float t, float h, float p)
         {
@@ -635,34 +521,8 @@ namespace TempHumidityMonitor
         }
 
         // ==================== 数据记录 ====================
-        private void InitLogFile()
-        {
-            try
-            {
-                string dir = Path.Combine(Application.StartupPath, "DataLog");
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                logFilePath = Path.Combine(dir, string.Format("data_{0:yyyyMMdd}.csv", DateTime.Now));
-            }
-            catch (Exception ex) { LogError("初始化日志失败: " + ex.Message); }
-        }
-
-        private void LogDataToFile(float t, float h, float p)
-        {
-            try
-            {
-                string dir = Path.GetDirectoryName(logFilePath);
-                string f = Path.Combine(dir, string.Format("data_{0:yyyyMMdd}.csv", DateTime.Now));
-                bool newFile = f != logFilePath;
-                logFilePath = f;
-                using (StreamWriter sw = new StreamWriter(logFilePath, true, Encoding.UTF8))
-                {
-                    if (newFile || new FileInfo(logFilePath).Length == 0)
-                        sw.WriteLine("时间,温度(℃),湿度(%),气压(kPa)");
-                    sw.WriteLine(string.Format("{0:yyyy-MM-dd HH:mm:ss},{1:F1},{2:F1},{3:F1}", DateTime.Now, t, h, p));
-                }
-            }
-            catch { }
-        }
+        private void InitLogFile() { }
+        private void LogDataToFile(float t, float h, float p) { logService.LogData(t, h, p); }
 
         private string GetDbPath()
         {
@@ -679,56 +539,12 @@ namespace TempHumidityMonitor
 
         private void SaveToDatabase(float t, float h, float p)
         {
-            try
-            {
-                using (var conn = new SQLiteConnection("Data Source=" + GetDbPath() + ";Version=3;"))
-                {
-                    conn.Open();
-                    using (var cmd = conn.CreateCommand())
-                    {
-                        cmd.CommandText = @"INSERT INTO sensor_data (timestamp, temperature, humidity, pressure, read_mode, is_simulated, is_alarm, alarm_msg)
-                                           VALUES (@ts, @t, @h, @p, @mode, @sim, @alarm, @msg)";
-                        cmd.Parameters.AddWithValue("@alarm", string.IsNullOrEmpty(lastAlarmMsg) ? 0 : 1);
-                        cmd.Parameters.AddWithValue("@msg", lastAlarmMsg);
-                        cmd.Parameters.AddWithValue("@ts", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                        cmd.Parameters.AddWithValue("@t", t);
-                        cmd.Parameters.AddWithValue("@h", h);
-                        cmd.Parameters.AddWithValue("@p", p);
-                        cmd.Parameters.AddWithValue("@mode", readModeIndex.ToString());
-                        cmd.Parameters.AddWithValue("@sim", isSimMode ? 1 : 0);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError("数据库写入失败: " + ex.Message);
-            }
+            try { dbService.SaveReading(t, h, p, readModeIndex, isSimMode, lastAlarmMsg); }
+            catch (Exception ex) { LogError("数据库写入失败: " + ex.Message); }
         }
 
-        private void LogAlarmToFile(string msg)
-        {
-            try
-            {
-                string dir = Path.Combine(Application.StartupPath, "DataLog");
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                File.AppendAllText(Path.Combine(dir, string.Format("alarm_{0:yyyyMMdd}.log", DateTime.Now)),
-                    string.Format("[{0:HH:mm:ss}] {1}\n", DateTime.Now, msg), Encoding.UTF8);
-            }
-            catch { }
-        }
-
-        private void LogError(string msg)
-        {
-            try
-            {
-                string dir = Path.Combine(Application.StartupPath, "DataLog");
-                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                File.AppendAllText(Path.Combine(dir, string.Format("error_{0:yyyyMMdd}.log", DateTime.Now)),
-                    string.Format("[{0:HH:mm:ss}] {1}\n", DateTime.Now, msg), Encoding.UTF8);
-            }
-            catch { }
-        }
+        private void LogAlarmToFile(string msg) { logService.LogAlarm(msg); }
+        private void LogError(string msg) { logService.LogError(msg); }
 
         // ==================== 导出CSV ====================
         private void btnExportCSV_Click(object sender, EventArgs e)
@@ -977,34 +793,12 @@ namespace TempHumidityMonitor
         {
             try
             {
-                using (var conn = new SQLiteConnection("Data Source=" + GetDbPath() + ";Version=3;"))
-                {
-                    conn.Open();
-                    using (var cmd = conn.CreateCommand())
-                    {
-                        string whereAlarm = chkAlarmOnly.Checked ? " AND is_alarm=1" : "";
-                        cmd.CommandText = @"SELECT timestamp as 时间, temperature as 温度, humidity as 湿度,
-                            pressure as 气压, CASE WHEN is_simulated=1 THEN '模拟' ELSE '实时' END as 来源,
-                            CASE WHEN is_alarm=1 THEN alarm_msg ELSE '' END as 报警信息
-                            FROM sensor_data WHERE timestamp BETWEEN @s AND @e" + whereAlarm + " ORDER BY timestamp DESC LIMIT 2000";
-                        cmd.Parameters.AddWithValue("@s", dtpStart.Value.ToString("yyyy-MM-dd") + " 00:00:00");
-                        cmd.Parameters.AddWithValue("@e", dtpEnd.Value.ToString("yyyy-MM-dd") + " 23:59:59");
-                        using (var adapter = new System.Data.SQLite.SQLiteDataAdapter(cmd))
-                        {
-                            var dt = new System.Data.DataTable();
-                            adapter.Fill(dt);
-                            dgvHistory.DataSource = dt;
-                        }
-                    }
-                }
+                var dt = dbService.QueryHistory(dtpStart.Value, dtpEnd.Value, chkAlarmOnly.Checked);
+                dgvHistory.DataSource = dt;
                 lblStatus.Text = string.Format("查询到 {0} 条历史记录", dgvHistory.RowCount);
                 lblStatus.ForeColor = Color.Green;
             }
-            catch (Exception ex)
-            {
-                lblStatus.Text = "查询失败: " + ex.Message;
-                lblStatus.ForeColor = Color.Red;
-            }
+            catch (Exception ex) { lblStatus.Text = "查询失败: " + ex.Message; lblStatus.ForeColor = Color.Red; }
         }
 
         private void btnCleanDB_Click(object sender, EventArgs e)
@@ -1012,26 +806,8 @@ namespace TempHumidityMonitor
             int days = (int)nudRetainDays.Value;
             if (MessageBox.Show(string.Format("将删除 {0} 天前的所有数据，确认？", days), "清理确认", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) == DialogResult.OK)
             {
-                try
-                {
-                    CleanOldData(days);
-                    ShowTip("清理完成");
-                }
+                try { dbService.CleanOldData(days); ShowTip("清理完成"); }
                 catch (Exception ex) { ShowTip("清理失败: " + ex.Message); }
-            }
-        }
-
-        private void CleanOldData(int retainDays)
-        {
-            using (var conn = new SQLiteConnection("Data Source=" + GetDbPath() + ";Version=3;"))
-            {
-                conn.Open();
-                using (var cmd = conn.CreateCommand())
-                {
-                    cmd.CommandText = "DELETE FROM sensor_data WHERE timestamp < @cutoff";
-                    cmd.Parameters.AddWithValue("@cutoff", DateTime.Now.AddDays(-retainDays).ToString("yyyy-MM-dd"));
-                    cmd.ExecuteNonQuery();
-                }
             }
         }
 
