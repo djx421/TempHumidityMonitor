@@ -131,6 +131,8 @@ namespace TempHumidityMonitor
             catch { }
 
             InitLogFile();
+            LoadModbusConfig();
+            try { CleanOldData((int)nudRetainDays.Value); } catch { }
             dtpStart.Value = DateTime.Today;
             dtpEnd.Value = DateTime.Now;
             SwitchTab(true);
@@ -234,22 +236,54 @@ namespace TempHumidityMonitor
             }
         }
 
+        private Dictionary<int, byte[]> modbusCommands;
+
+        private void LoadModbusConfig()
+        {
+            modbusCommands = new Dictionary<int, byte[]>();
+            string path = Path.Combine(Application.StartupPath, "modbus_config.json");
+            if (!File.Exists(path))
+                path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\modbus_config.json");
+            try
+            {
+                if (File.Exists(path))
+                {
+                    string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+                    int idx = -1;
+                    foreach (string line in lines)
+                    {
+                        if (line.Contains("\"index\""))
+                            int.TryParse(System.Text.RegularExpressions.Regex.Match(line, @"\d+").Value, out idx);
+                        else if (idx >= 0 && line.Contains("\"bytes\""))
+                        {
+                            string hex = System.Text.RegularExpressions.Regex.Match(line, @"[0-9A-Fa-f, ]+").Value;
+                            var bytes = hex.Split(',').Select(s => byte.Parse(s.Trim(), System.Globalization.NumberStyles.HexNumber)).ToArray();
+                            modbusCommands[idx] = bytes;
+                            idx = -1;
+                        }
+                    }
+                }
+            }
+            catch { }
+            if (modbusCommands.Count == 0)
+            {
+                modbusCommands[0] = new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x04, 0x44, 0x09 };
+                modbusCommands[1] = new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x04, 0x45, 0xE1 };
+                modbusCommands[2] = new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x02, 0xC4, 0x0B };
+                modbusCommands[3] = new byte[] { 0x01, 0x03, 0x00, 0x02, 0x00, 0x02, 0x65, 0xCB };
+                modbusCommands[4] = new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x01, 0x85, 0xE2 };
+                modbusCommands[5] = new byte[] { 0x01, 0x03, 0x00, 0x81, 0x00, 0x01, 0xD4, 0x22 };
+                modbusCommands[6] = new byte[] { 0x01, 0x03, 0x00, 0x04, 0x00, 0x02, 0x85, 0xCA };
+                modbusCommands[7] = new byte[] { 0x01, 0x03, 0x00, 0x82, 0x00, 0x01, 0x24, 0x22 };
+                modbusCommands[8] = new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x06, 0xC5, 0xC8 };
+                modbusCommands[9] = new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x04, 0x45, 0xE1 };
+            }
+        }
+
         private byte[] GetModbusCommand()
         {
-            switch (readModeIndex)
-            {
-                case 0: return new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x04, 0x44, 0x09 };
-                case 1: return new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x04, 0x45, 0xE1 };
-                case 2: return new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x02, 0xC4, 0x0B };
-                case 3: return new byte[] { 0x01, 0x03, 0x00, 0x02, 0x00, 0x02, 0x65, 0xCB };
-                case 4: return new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x01, 0x85, 0xE2 };
-                case 5: return new byte[] { 0x01, 0x03, 0x00, 0x81, 0x00, 0x01, 0xD4, 0x22 };
-                case 6: return new byte[] { 0x01, 0x03, 0x00, 0x04, 0x00, 0x02, 0x85, 0xCA };
-                case 7: return new byte[] { 0x01, 0x03, 0x00, 0x82, 0x00, 0x01, 0x24, 0x22 };
-                case 8: return new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x06, 0xC5, 0xC8 };
-                case 9: return new byte[] { 0x01, 0x03, 0x00, 0x80, 0x00, 0x04, 0x45, 0xE1 };
-                default: return new byte[] { 0x01, 0x03, 0x00, 0x00, 0x00, 0x04, 0x44, 0x09 };
-            }
+            if (modbusCommands.TryGetValue(readModeIndex, out var cmd)) return cmd;
+            return modbusCommands[0];
         }
 
         private void SimulateData()
@@ -811,8 +845,49 @@ namespace TempHumidityMonitor
             catch { }
         }
 
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            if (WindowState == FormWindowState.Minimized)
+            {
+                this.Hide();
+                notifyIcon1.ShowBalloonTip(2000, "温湿度监控", "程序已最小化到系统托盘", ToolTipIcon.Info);
+            }
+        }
+
+        private void notifyIcon1_DoubleClick(object sender, EventArgs e)
+        {
+            this.Show();
+            this.WindowState = FormWindowState.Normal;
+            this.Activate();
+        }
+
+        private void trayShow_Click(object sender, EventArgs e)
+        {
+            this.Show();
+            this.WindowState = FormWindowState.Normal;
+            this.Activate();
+        }
+
+        private void trayExit_Click(object sender, EventArgs e)
+        {
+            notifyIcon1.Visible = false;
+            notifyIcon1.Dispose();
+            SaveAllSettings();
+            if (isComOpen) closeComPort();
+            Application.Exit();
+        }
+
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
-        { SaveAllSettings(); if (isComOpen) closeComPort(); }
+        {
+            if (e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                this.Hide();
+                return;
+            }
+            SaveAllSettings(); if (isComOpen) closeComPort();
+        }
 
         // ==================== 辅助 ====================
         private void PlayBeep()
@@ -929,6 +1004,34 @@ namespace TempHumidityMonitor
             {
                 lblStatus.Text = "查询失败: " + ex.Message;
                 lblStatus.ForeColor = Color.Red;
+            }
+        }
+
+        private void btnCleanDB_Click(object sender, EventArgs e)
+        {
+            int days = (int)nudRetainDays.Value;
+            if (MessageBox.Show(string.Format("将删除 {0} 天前的所有数据，确认？", days), "清理确认", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) == DialogResult.OK)
+            {
+                try
+                {
+                    CleanOldData(days);
+                    ShowTip("清理完成");
+                }
+                catch (Exception ex) { ShowTip("清理失败: " + ex.Message); }
+            }
+        }
+
+        private void CleanOldData(int retainDays)
+        {
+            using (var conn = new SQLiteConnection("Data Source=" + GetDbPath() + ";Version=3;"))
+            {
+                conn.Open();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "DELETE FROM sensor_data WHERE timestamp < @cutoff";
+                    cmd.Parameters.AddWithValue("@cutoff", DateTime.Now.AddDays(-retainDays).ToString("yyyy-MM-dd"));
+                    cmd.ExecuteNonQuery();
+                }
             }
         }
 

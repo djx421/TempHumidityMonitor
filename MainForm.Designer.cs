@@ -19,7 +19,9 @@ namespace TempHumidityMonitor
         private GroupBox gbSerial, gbCollect, gbAlarm, gbData;
         private ComboBox cbComPort, cbBaudRate, cbReadMode;
         private Button btnRefreshPorts, btnOpenCloseCom, btnManualSend;
-        private Button btnExportCSV, btnClearChart;
+        private Button btnExportCSV, btnClearChart, btnCleanDB;
+        private NumericUpDown nudRetainDays;
+        private Label lblRetainDays;
         private CheckBox chkEnableAlarm, chkDataLog;
         private NumericUpDown nudInterval, nudMaxPoints;
         private NumericUpDown nudTempHigh, nudTempLow, nudHumiHigh, nudHumiLow;
@@ -44,6 +46,8 @@ namespace TempHumidityMonitor
         // ==================== 非可视组件 ====================
         private Timer timer1;
         private System.IO.Ports.SerialPort serialPort1;
+        private NotifyIcon notifyIcon1;
+        private ContextMenuStrip cmsTray;
 
         // ==================== Dispose ====================
         protected override void Dispose(bool disposing)
@@ -127,6 +131,9 @@ namespace TempHumidityMonitor
             this.chkDataLog = new System.Windows.Forms.CheckBox();
             this.btnExportCSV = new System.Windows.Forms.Button();
             this.btnClearChart = new System.Windows.Forms.Button();
+            this.btnCleanDB = new System.Windows.Forms.Button();
+            this.nudRetainDays = new System.Windows.Forms.NumericUpDown();
+            this.lblRetainDays = new System.Windows.Forms.Label();
             this.lblStatus = new System.Windows.Forms.Label();
             this.btnTabCurrent = new System.Windows.Forms.Button();
             this.btnTabHistory = new System.Windows.Forms.Button();
@@ -149,6 +156,8 @@ namespace TempHumidityMonitor
             this.tsslTime = new System.Windows.Forms.ToolStripStatusLabel();
             this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.serialPort1 = new System.IO.Ports.SerialPort(this.components);
+            this.notifyIcon1 = new System.Windows.Forms.NotifyIcon(this.components);
+            this.cmsTray = new System.Windows.Forms.ContextMenuStrip(this.components);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -171,6 +180,7 @@ namespace TempHumidityMonitor
             ((System.ComponentModel.ISupportInitialize)(this.nudPressureHigh)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudPressureLow)).BeginInit();
             this.gbData.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.nudRetainDays)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.statusStrip1.SuspendLayout();
             this.SuspendLayout();
@@ -1037,9 +1047,12 @@ namespace TempHumidityMonitor
             this.gbData.Controls.Add(this.chkDataLog);
             this.gbData.Controls.Add(this.btnExportCSV);
             this.gbData.Controls.Add(this.btnClearChart);
+            this.gbData.Controls.Add(this.lblRetainDays);
+            this.gbData.Controls.Add(this.nudRetainDays);
+            this.gbData.Controls.Add(this.btnCleanDB);
             this.gbData.Location = new System.Drawing.Point(12, 660);
             this.gbData.Name = "gbData";
-            this.gbData.Size = new System.Drawing.Size(280, 105);
+            this.gbData.Size = new System.Drawing.Size(280, 145);
             this.gbData.TabIndex = 6;
             this.gbData.TabStop = false;
             this.gbData.Text = "数据管理";
@@ -1056,20 +1069,49 @@ namespace TempHumidityMonitor
             // 
             // btnExportCSV
             // 
-            this.btnExportCSV.Location = new System.Drawing.Point(30, 39);
+            this.btnExportCSV.Location = new System.Drawing.Point(30, 36);
             this.btnExportCSV.Name = "btnExportCSV";
             this.btnExportCSV.Size = new System.Drawing.Size(220, 27);
             this.btnExportCSV.TabIndex = 1;
             this.btnExportCSV.Text = "导出CSV文件";
-            // 
+            //
             // btnClearChart
-            // 
-            this.btnClearChart.Location = new System.Drawing.Point(30, 69);
+            //
+            this.btnClearChart.Location = new System.Drawing.Point(30, 66);
             this.btnClearChart.Name = "btnClearChart";
-            this.btnClearChart.Size = new System.Drawing.Size(220, 27);
+            this.btnClearChart.Size = new System.Drawing.Size(110, 27);
             this.btnClearChart.TabIndex = 2;
             this.btnClearChart.Text = "全部清除";
-            // 
+            //
+            // lblRetainDays
+            //
+            this.lblRetainDays.Location = new System.Drawing.Point(10, 100);
+            this.lblRetainDays.Name = "lblRetainDays";
+            this.lblRetainDays.Size = new System.Drawing.Size(72, 22);
+            this.lblRetainDays.TabIndex = 3;
+            this.lblRetainDays.Text = "保留天数:";
+            this.lblRetainDays.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            //
+            // nudRetainDays
+            //
+            this.nudRetainDays.Location = new System.Drawing.Point(86, 99);
+            this.nudRetainDays.Maximum = new decimal(new int[] { 365, 0, 0, 0 });
+            this.nudRetainDays.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            this.nudRetainDays.Name = "nudRetainDays";
+            this.nudRetainDays.Size = new System.Drawing.Size(56, 25);
+            this.nudRetainDays.TabIndex = 4;
+            this.nudRetainDays.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            this.nudRetainDays.Value = new decimal(new int[] { 90, 0, 0, 0 });
+            //
+            // btnCleanDB
+            //
+            this.btnCleanDB.Location = new System.Drawing.Point(150, 96);
+            this.btnCleanDB.Name = "btnCleanDB";
+            this.btnCleanDB.Size = new System.Drawing.Size(110, 27);
+            this.btnCleanDB.TabIndex = 5;
+            this.btnCleanDB.Text = "清理旧数据";
+            this.btnCleanDB.UseVisualStyleBackColor = true;
+            //
             // lblStatus
             // 
             this.lblStatus.Location = new System.Drawing.Point(12, 778);
@@ -1232,9 +1274,25 @@ namespace TempHumidityMonitor
             this.tsslTime.Text = "00:00";
             // 
             // timer1
-            // 
+            //
             this.timer1.Interval = 1000;
-            // 
+            //
+            // cmsTray
+            //
+            this.cmsTray.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            new System.Windows.Forms.ToolStripMenuItem("显示窗口", null, new System.EventHandler(this.trayShow_Click)),
+            new System.Windows.Forms.ToolStripMenuItem("退出程序", null, new System.EventHandler(this.trayExit_Click))});
+            this.cmsTray.Name = "cmsTray";
+            this.cmsTray.Size = new System.Drawing.Size(120, 48);
+            //
+            // notifyIcon1
+            //
+            this.notifyIcon1.ContextMenuStrip = this.cmsTray;
+            this.notifyIcon1.Icon = System.Drawing.SystemIcons.Application;
+            this.notifyIcon1.Text = "温湿度传感器监控";
+            this.notifyIcon1.Visible = true;
+            this.notifyIcon1.DoubleClick += new System.EventHandler(this.notifyIcon1_DoubleClick);
+            //
             // MainForm
             // 
             this.ClientSize = new System.Drawing.Size(1222, 903);
@@ -1266,6 +1324,7 @@ namespace TempHumidityMonitor
             ((System.ComponentModel.ISupportInitialize)(this.nudPressureHigh)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudPressureLow)).EndInit();
             this.gbData.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.nudRetainDays)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).EndInit();
             this.statusStrip1.ResumeLayout(false);
             this.statusStrip1.PerformLayout();
@@ -1300,6 +1359,7 @@ namespace TempHumidityMonitor
             this.btnToggleRead.Click += btnToggleRead_Click;
             this.btnQueryHistory.Click += btnQueryHistory_Click;
             this.btnExportHistory.Click += btnExportHistory_Click;
+            this.btnCleanDB.Click += btnCleanDB_Click;
 
         }
 
