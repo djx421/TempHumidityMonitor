@@ -514,7 +514,15 @@ namespace TempHumidityMonitor
 
         private string GetDbPath()
         {
-            return Path.Combine(Application.StartupPath, "TempHumidityData.db");
+            string dbPath = Path.Combine(Application.StartupPath, "TempHumidityData.db");
+            // 首次运行或clean build后从项目根目录复制模板数据库
+            if (!File.Exists(dbPath))
+            {
+                string templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\TempHumidityData.db");
+                if (File.Exists(templatePath))
+                    File.Copy(templatePath, dbPath);
+            }
+            return dbPath;
         }
 
         private void SaveToDatabase(float t, float h, float p)
