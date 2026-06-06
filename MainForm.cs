@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -40,13 +40,14 @@ namespace TempHumidityMonitor
         private bool isReading = false;
         private string lastAlarmMsg = "";
         private DateTime lastAlarmSound = DateTime.MinValue;
-        private int reconnectRetry = 0;
         private string lastPortName = "";
         private bool isReconnecting = false;
         private int connectVersion = 0;
         private Timer reconnectTimer;
         private DatabaseService dbService;
         private LogService logService;
+        private ApiService apiService;
+        private int apiPort = 8090;
 
         // ==================== 构造函数 ====================
         public MainForm()
@@ -147,6 +148,53 @@ namespace TempHumidityMonitor
             Timer timeTimer = new Timer { Interval = 1000 };
             timeTimer.Tick += (s, ev) => { tsslTime.Text = DateTime.Now.ToString("HH:mm:ss"); };
             timeTimer.Start();
+
+            // 修复窗体图标和托盘图标
+            try
+            {
+                string iconPath = Path.Combine(Application.StartupPath, "app_icon.ico");
+                if (!File.Exists(iconPath))
+                    iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\app_icon.ico");
+                if (File.Exists(iconPath))
+                {
+                    var appIcon = new Icon(iconPath);
+                    this.Icon = appIcon;
+                    notifyIcon1.Icon = appIcon;
+                }
+            }
+            catch { }
+
+            // 网页服务事件绑定（控件在设计器中已创建）
+            try
+            {
+                nudWebPort.ValueChanged += (s, ev) =>
+                {
+                    apiPort = (int)nudWebPort.Value;
+                    lblStatus.Text = "网页端口已更改为 " + apiPort + "（需重启程序生效）";
+                    lblStatus.ForeColor = Color.Orange;
+                };
+                btnOpenWeb.Click += (s, ev) =>
+                {
+                    System.Diagnostics.Process.Start("http://localhost:" + apiPort + "/");
+                };
+            }
+            catch { }
+
+            // 启动 HTTP API 服务
+            try
+            {
+                string webRoot = Path.Combine(Application.StartupPath, "web");
+                if (!Directory.Exists(webRoot))
+                    webRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\web"));
+                apiService = new ApiService(apiPort, webRoot, dbService);
+                apiService.Start();
+                lblStatus.Text = "API: http://localhost:" + apiPort + "/ | " + lblStatus.Text;
+            }
+            catch (Exception ex)
+            {
+                lblStatus.Text = "API启动失败(端口" + apiPort + "): " + ex.Message;
+                lblStatus.ForeColor = Color.Red;
+            }
         }
 
         // ==================== 串口操作 ====================
@@ -169,7 +217,10 @@ namespace TempHumidityMonitor
         }
 
         private void btnOpenCloseCom_Click(object sender, EventArgs e)
-        { if (isComOpen) closeComPort(); else openComPort(); }
+        {
+            if (isReconnecting) { isReconnecting = false; CancelTimer(); closeComPort(); return; }
+            if (isComOpen) closeComPort(); else openComPort();
+        }
 
         private void openComPort()
         {
@@ -184,14 +235,24 @@ namespace TempHumidityMonitor
                 serialPort1.ReadTimeout = 500; serialPort1.WriteTimeout = 500;
                 serialPort1.Open();
                 isComOpen = true;
-                btnOpenCloseCom.Text = "关闭串口"; btnOpenCloseCom.BackColor = Color.LightCoral;
-                reconnectRetry = 0; isReconnecting = false;
+                if (!isReconnecting)
+                {
+                    btnOpenCloseCom.Text = "关闭串口"; btnOpenCloseCom.BackColor = Color.LightCoral;
+                }
+                btnOpenCloseCom.Enabled = true;
+                if (!isReconnecting)
+                {
+                    _retryCount = 0; isReconnecting = false;
+                }
+                CancelTimer();
                 tsslStatus.Text = "● 串口已打开 - " + portName; tsslStatus.ForeColor = Color.Green;
                 timer1.Interval = (int)nudInterval.Value;
                 isReading = true; UpdateToggleButton();
                 btnToggleRead.Text = "■ 停止采集"; btnToggleRead.BackColor = Color.LightCoral;
                 cbComPort.Enabled = false; btnRefreshPorts.Enabled = false; cbBaudRate.Enabled = false;
                 lblStatus.Text = "串口已打开，正在采集数据..."; lblStatus.ForeColor = Color.Green;
+                ApiService.UpdateStatus(true, false, true, false, "串口已打开，正在采集数据...");
+                lastReceiveTime = DateTime.Now; // 启动超时计时：15秒无有效数据 → 触发重连
                 receiveBuffer.Clear();
             }
             catch (Exception ex) { if (!isReconnecting) ShowTip("打开串口失败: " + ex.Message); LogError("打开串口失败: " + ex.Message); }
@@ -199,27 +260,39 @@ namespace TempHumidityMonitor
 
         private void closeComPort()
         {
-            try
-            {
-                timer1.Stop(); if (serialPort1.IsOpen) serialPort1.Close();
-                isComOpen = false; isReading = false;
-                btnOpenCloseCom.Text = "打开串口"; btnOpenCloseCom.BackColor = SystemColors.Control;
-                btnToggleRead.Enabled = false; btnToggleRead.Text = "▶ 开始采集";
-                btnToggleRead.BackColor = SystemColors.Control;
-                tsslStatus.Text = "● 串口已关闭"; tsslStatus.ForeColor = Color.Gray;
-                cbComPort.Enabled = true; btnRefreshPorts.Enabled = true; cbBaudRate.Enabled = true;
-                lblStatus.Text = "串口已关闭"; lblStatus.ForeColor = Color.Gray;
-            }
-            catch (Exception ex) { LogError("关闭串口失败: " + ex.Message); }
+            isReconnecting = false;
+            CancelTimer();
+            timer1.Stop();
+            try { if (serialPort1.IsOpen) serialPort1.Close(); } catch { }
+            try { serialPort1.Dispose(); } catch { }
+            serialPort1 = new System.IO.Ports.SerialPort();
+            serialPort1.DataReceived += serialPort1_DataReceived;
+            serialPort1.ErrorReceived += serialPort1_ErrorReceived;
+            isComOpen = false; isReading = false;
+            btnOpenCloseCom.Text = "打开串口"; btnOpenCloseCom.BackColor = SystemColors.Control;
+            btnOpenCloseCom.Enabled = true;
+            btnToggleRead.Enabled = false; btnToggleRead.Text = "▶ 开始采集";
+            btnToggleRead.BackColor = SystemColors.Control;
+            tsslStatus.Text = "● 串口已关闭"; tsslStatus.ForeColor = Color.Gray;
+            cbComPort.Enabled = true; btnRefreshPorts.Enabled = true; cbBaudRate.Enabled = true;
+            lblStatus.Text = "串口已关闭"; lblStatus.ForeColor = Color.Gray;
+            ApiService.UpdateStatus(false, false, false, false, "串口已关闭");
         }
 
         // ==================== 定时器 ====================
         private void timer1_Tick(object sender, EventArgs e)
         {
-            if (isComOpen && !isSimMode && lastReceiveTime > DateTime.MinValue &&
+            if (!isComOpen || isSimMode)
+            {
+                if (isReading) sendData();
+                return;
+            }
+
+            // 15 秒无有效数据
+            if (lastReceiveTime > DateTime.MinValue &&
                 (DateTime.Now - lastReceiveTime).TotalSeconds > 15)
             {
-                TryReconnect(); return;
+                TryReconnect("连接断开"); return;
             }
             if (isReading) sendData();
         }
@@ -234,12 +307,14 @@ namespace TempHumidityMonitor
                 byte[] cmd = ModbusService.GetCommand(readModeIndex);
                 serialPort1.Write(cmd, 0, cmd.Length);
                 nSend++; tsslSend.Text = "发送: " + nSend;
+                ApiService.UpdateCounters(nSend, nReceive, nError);
             }
             catch (Exception ex)
             {
                 nError++; tsslError.Text = "错误: " + nError;
+                ApiService.UpdateCounters(nSend, nReceive, nError);
                 LogError("发送数据失败: " + ex.Message);
-                if (isComOpen) TryReconnect();
+                if (isComOpen) TryReconnect("连接断开");
             }
         }
 
@@ -254,11 +329,13 @@ namespace TempHumidityMonitor
             simPressure = Math.Max(95, Math.Min(110, simPressure));
             nSend++; nReceive++;
             tsslSend.Text = "发送: " + nSend; tsslRecv.Text = "接收: " + nReceive;
+            ApiService.UpdateCounters(nSend, nReceive, nError);
             lastReceiveTime = DateTime.Now;
             AddDataPoint(simTemp, simHumi, simPressure);
             if (alarmEnabled) CheckAlarm(simTemp, simHumi, simPressure);
             if (dataLogEnabled) LogDataToFile(simTemp, simHumi, simPressure);
             SaveToDatabase(simTemp, simHumi, simPressure);
+            ApiService.BroadcastSensorData(simTemp, simHumi, simPressure, true);
             this.BeginInvoke(new Action(() => updateUI(simTemp, simHumi, simPressure)));
         }
 
@@ -281,6 +358,7 @@ namespace TempHumidityMonitor
                 btnToggleRead.Text = "■ 停止采集"; btnToggleRead.BackColor = Color.LightCoral;
                 tsslStatus.Text = "● 模拟模式 - 演示数据"; tsslStatus.ForeColor = Color.Orange;
                 lblStatus.Text = "模拟模式运行中"; lblStatus.ForeColor = Color.Orange;
+                ApiService.UpdateStatus(false, true, true, false, "模拟模式运行中");
             }
             else
             {
@@ -290,6 +368,7 @@ namespace TempHumidityMonitor
                 cbComPort.Enabled = true; btnRefreshPorts.Enabled = true; cbBaudRate.Enabled = true;
                 tsslStatus.Text = "● 串口未打开"; tsslStatus.ForeColor = Color.Gray;
                 lblStatus.Text = "就绪"; lblStatus.ForeColor = Color.Gray;
+                ApiService.UpdateStatus(false, false, false, false, "就绪");
             }
         }
 
@@ -315,7 +394,7 @@ namespace TempHumidityMonitor
                     ProcessFrame(frame);
                 }
             }
-            catch (Exception ex) { LogError("接收异常: " + ex.Message); nError++; UpdateStatus(); if (isComOpen) this.BeginInvoke(new Action(() => TryReconnect())); }
+            catch (Exception ex) { LogError("接收异常: " + ex.Message); nError++; UpdateStatus(); if (isComOpen) this.BeginInvoke(new Action(() => TryReconnect("连接断开"))); }
         }
 
         private void serialPort1_ErrorReceived(object sender, SerialErrorReceivedEventArgs e)
@@ -325,93 +404,165 @@ namespace TempHumidityMonitor
             this.BeginInvoke(new Action(() =>
             {
                 tsslError.Text = "错误: " + nError;
-                if (isComOpen)
-                {
-                    TryReconnect();
-                }
+                // 不立即触发重连，由 timer1_Tick 的 15 秒超时统一处理，
+                // 避免错误端口频繁产生串口错误导致"打开→重连→打开"死循环
             }));
         }
+        private string _reconnectReason = "";
+        private int _retryCount = 0;
 
-        private void TryReconnect()
+        // ==================== 重连逻辑 ====================
+
+        private void TryReconnect(string reason)
         {
-            if (isReconnecting) return;
+            if (isSimMode) return;
+            _reconnectReason = reason;
+
+            // 关闭旧端口
+            timer1.Stop();
+            try { if (serialPort1.IsOpen) serialPort1.Close(); } catch { }
+            try { serialPort1.Dispose(); } catch { }
+            serialPort1 = new System.IO.Ports.SerialPort();
+            serialPort1.DataReceived += serialPort1_DataReceived;
+            serialPort1.ErrorReceived += serialPort1_ErrorReceived;
+            isComOpen = false; isReading = false;
+            CancelTimer();
+
+            // 进入重连状态
             isReconnecting = true;
             connectVersion++;
             lastAlarmMsg = "";
-            reconnectRetry = 0;
-            try { serialPort1.Close(); } catch { }
-            isComOpen = false; isReading = false;
-            timer1.Stop();
-            btnOpenCloseCom.Text = "打开串口"; btnOpenCloseCom.BackColor = SystemColors.Control;
-            btnToggleRead.Enabled = false; btnToggleRead.Text = "▶ 开始采集"; btnToggleRead.BackColor = SystemColors.Control;
-            tsslStatus.Text = "● 串口断线重连中"; tsslStatus.ForeColor = Color.OrangeRed;
-            DoRetry();
+
+            btnOpenCloseCom.Enabled = true;
+            btnOpenCloseCom.Text = "取消重连";
+            btnOpenCloseCom.BackColor = Color.Orange;
+            btnToggleRead.Enabled = false;
+            btnToggleRead.Text = "▶ 开始采集";
+            btnToggleRead.BackColor = SystemColors.Control;
+            cbComPort.Enabled = false;
+            btnRefreshPorts.Enabled = false;
+            cbBaudRate.Enabled = false;
+            tsslStatus.Text = "\u25CF " + reason + "，重连中";
+            tsslStatus.ForeColor = Color.OrangeRed;
+            ApiService.UpdateStatus(false, false, false, true, reason + "，重连中...");
+
+            _retryCount++;
+            if (_retryCount > 3) { GiveUp(); return; }
+            lblStatus.Text = string.Format(reason + "，5秒后自动重连({0}/3)...", _retryCount);
+            lblStatus.ForeColor = Color.OrangeRed;
+
+            if (reconnectTimer != null) reconnectTimer.Dispose();
+            reconnectTimer = new Timer { Interval = 5000 };
+            reconnectTimer.Tick += (s, ev) =>
+            {
+                CancelTimer();
+                if (!isReconnecting) return;
+                RefreshComPorts();
+                if (cbComPort.Items.Count == 0 || cbComPort.Items[0].ToString() == "无可用串口")
+                {
+                    if (_retryCount >= 3) { GiveUp(); return; }
+                    lblStatus.Text = string.Format("未检测到串口，5秒后重试({0}/3)...", _retryCount);
+                    lblStatus.ForeColor = Color.OrangeRed;
+                    reconnectTimer = new Timer { Interval = 5000 };
+                    reconnectTimer.Tick += (s2, ev2) => { CancelTimer(); if (isReconnecting) DoRetry(); };
+                    reconnectTimer.Start();
+                    return;
+                }
+                DoRetry();
+            };
+            reconnectTimer.Start();
         }
 
         private void DoRetry()
         {
-            if (isSimMode) { isReconnecting = false; return; }
-            if (reconnectRetry >= 3)
-            {
-                isReconnecting = false;
-                lblStatus.Text = "自动重连失败(已重试3次)，请手动打开串口";
-                lblStatus.ForeColor = Color.Red;
-                tsslStatus.Text = "● 串口未打开"; tsslStatus.ForeColor = Color.Gray;
-                return;
-            }
-            reconnectRetry++;
-            lblStatus.Text = string.Format("串口断开，5秒后自动重连({0}/3)...", reconnectRetry);
-            lblStatus.ForeColor = Color.OrangeRed;
-            if (reconnectTimer == null)
-            {
-                reconnectTimer = new Timer { Interval = 5000 };
-                reconnectTimer.Tick += (s, ev) =>
-                {
-                    reconnectTimer.Stop();
-                    RefreshComPorts();
-                    if (!string.IsNullOrEmpty(lastPortName) && cbComPort.Items.Contains(lastPortName))
-                        cbComPort.Text = lastPortName;
-                    else if (cbComPort.Items.Count > 0 && cbComPort.Items[0].ToString() != "无可用串口")
-                        cbComPort.SelectedIndex = 0;
-                    openComPort();
-                    if (isComOpen)
-                    {
-                        isReconnecting = false;
-                        reconnectRetry = 0;
-                        lastReceiveTime = DateTime.Now;
-                        lblStatus.Text = "串口已恢复，正在采集数据...";
-                        lblStatus.ForeColor = Color.Green;
-                    }
-                    else
-                    {
-                        DoRetry();
-                    }
-                };
-            }
-            reconnectTimer.Start();
+            if (!isReconnecting) return;
+            if (!string.IsNullOrEmpty(lastPortName) && cbComPort.Items.Contains(lastPortName))
+                cbComPort.Text = lastPortName;
+            else if (cbComPort.Items.Count > 0)
+                cbComPort.SelectedIndex = 0;
+
+            openComPort();
+            if (!isComOpen) { TryReconnect(_reconnectReason); return; }
+
+            // 端口打开了，等数据来触发 ConfirmSuccess
+            lblStatus.Text = string.Format("重连{0}/3：端口已打开，等待数据...", _retryCount);
+            lblStatus.ForeColor = Color.Orange;
+        }
+
+        private void ConfirmSuccess()
+        {
+            isReconnecting = false;
+            _retryCount = 0;
+            CancelTimer();
+            btnOpenCloseCom.Text = "关闭串口";
+            btnOpenCloseCom.BackColor = Color.LightCoral;
+            lblStatus.Text = "数据已恢复，正在采集...";
+            lblStatus.ForeColor = Color.Green;
+            tsslStatus.Text = "\u25CF 串口已打开 - " + lastPortName;
+            tsslStatus.ForeColor = Color.Green;
+            ApiService.UpdateStatus(true, false, true, false, "数据已恢复");
+        }
+
+        private void GiveUp()
+        {
+            isReconnecting = false;
+            _retryCount = 0;
+            CancelTimer();
+            timer1.Stop();
+            try { if (serialPort1.IsOpen) serialPort1.Close(); } catch { }
+            try { serialPort1.Dispose(); } catch { }
+            serialPort1 = new System.IO.Ports.SerialPort();
+            serialPort1.DataReceived += serialPort1_DataReceived;
+            serialPort1.ErrorReceived += serialPort1_ErrorReceived;
+            isComOpen = false; isReading = false;
+            cbComPort.Enabled = true; btnRefreshPorts.Enabled = true; cbBaudRate.Enabled = true;
+            btnOpenCloseCom.Text = "打开串口";
+            btnOpenCloseCom.BackColor = SystemColors.Control;
+            btnOpenCloseCom.Enabled = true;
+            btnToggleRead.Enabled = false;
+            btnToggleRead.Text = "▶ 开始采集";
+            btnToggleRead.BackColor = SystemColors.Control;
+            tsslStatus.Text = "\u25CF 串口未打开";
+            tsslStatus.ForeColor = Color.Gray;
+            lblStatus.Text = "自动重连失败(已重试3次)，请检查设备或更换端口后手动打开";
+            lblStatus.ForeColor = Color.Red;
+            ApiService.UpdateStatus(false, false, false, false, "重连失败");
+        }
+
+        private void CancelTimer()
+        {
+            if (reconnectTimer != null) { reconnectTimer.Stop(); reconnectTimer.Dispose(); reconnectTimer = null; }
         }
 
         private void ProcessFrame(byte[] buffer)
         {
-            nReceive++; lastReceiveTime = DateTime.Now;
+            nReceive++;
+            ApiService.UpdateCounters(nSend, nReceive, nError);
             this.BeginInvoke(new Action(() => { tsslRecv.Text = "接收: " + nReceive; }));
             try
             {
                 if (!ModbusService.CheckFrame(buffer))
                 {
                     nError++;
+                    ApiService.UpdateCounters(nSend, nReceive, nError);
                     this.BeginInvoke(new Action(() => { tsslError.Text = "错误: " + nError; }));
                     return;
                 }
+                // 只有通过 CheckFrame 校验后才更新接收时间，避免垃圾数据重置超时
+                lastReceiveTime = DateTime.Now;
                 var data = ModbusService.ParseSensorData(buffer, readModeIndex, lastTemp, lastHumi, lastPressure);
                 float t = data.Temperature, h = data.Humidity, p = data.Pressure;
                 lastTemp = t; lastHumi = h; lastPressure = p;
                 if (t < -40 || t > 125 || h < 0 || h > 100 || p < 50 || p > 200)
                 { LogError(string.Format("数据超范围: T={0:F1} H={1:F1} P={2:F1}", t, h, p)); return; }
+                // 收到有效且合法的数据 → 如果在重连验证期则确认成功
+                if (isReconnecting)
+                    this.BeginInvoke(new Action(() => ConfirmSuccess()));
                 AddDataPoint(t, h, p);
                 if (alarmEnabled) CheckAlarm(t, h, p);
                 if (dataLogEnabled) LogDataToFile(t, h, p);
                 SaveToDatabase(t, h, p);
+                ApiService.BroadcastSensorData(t, h, p, false);
                 bool hasAlarm = alarmEnabled && (t > alarmTempH || t < alarmTempL || h > alarmHumiH || h < alarmHumiL || p > alarmPressH || p < alarmPressL);
                 this.BeginInvoke(new Action(() => updateUI(t, h, p)));
                 if (!hasAlarm)
@@ -424,6 +575,7 @@ namespace TempHumidityMonitor
             catch (Exception ex)
             {
                 nError++;
+                ApiService.UpdateCounters(nSend, nReceive, nError);
                 LogError("帧处理异常: " + ex.Message);
                 this.BeginInvoke(new Action(() =>
                 {
@@ -442,6 +594,9 @@ namespace TempHumidityMonitor
             if (h < humiMin) humiMin = h; if (h > humiMax) humiMax = h;
             if (p < pressureMin) pressureMin = p; if (p > pressureMax) pressureMax = p;
             tempSum += t; humiSum += h; pressureSum += p; dataCount++;
+            // 同步统计数据到 API
+            ApiService.UpdateStats(dataCount, tempMin, tempMax, tempSum,
+                humiMin, humiMax, humiSum, pressureMin, pressureMax, pressureSum);
         }
 
         private void updateUI(float t, float h, float p)
@@ -506,8 +661,10 @@ namespace TempHumidityMonitor
             if (p < alarmPressL) { list.Add(string.Format("气压低:{0:F1}", p, alarmPressL)); alarm = true; }
             string msg = alarm ? string.Join(";", list) : "";
             lastAlarmMsg = msg;
+            ApiService.UpdateAlarmMsg(msg);
             if (alarm)
             {
+                ApiService.IncrementAlarmCount();
                 if ((DateTime.Now - lastAlarmSound).TotalSeconds > 60)
                 {
                     lastAlarmSound = DateTime.Now;
@@ -621,7 +778,11 @@ namespace TempHumidityMonitor
         }
 
         private void chkEnableAlarm_CheckedChanged(object sender, EventArgs e)
-        { alarmEnabled = chkEnableAlarm.Checked; Settings.Default.EnableAlarm = alarmEnabled; Settings.Default.Save(); }
+        {
+            alarmEnabled = chkEnableAlarm.Checked;
+            Settings.Default.EnableAlarm = alarmEnabled; Settings.Default.Save();
+            ApiService.UpdateThresholds(alarmTempH, alarmTempL, alarmHumiH, alarmHumiL, alarmPressH, alarmPressL, alarmEnabled);
+        }
 
         private void chkDataLog_CheckedChanged(object sender, EventArgs e)
         { dataLogEnabled = chkDataLog.Checked; Settings.Default.EnableDataLog = dataLogEnabled; Settings.Default.Save(); }
@@ -634,6 +795,7 @@ namespace TempHumidityMonitor
             alarmHumiL = (float)nudHumiLow.Value;
             alarmPressH = (float)nudPressureHigh.Value;
             alarmPressL = (float)nudPressureLow.Value;
+            ApiService.UpdateThresholds(alarmTempH, alarmTempL, alarmHumiH, alarmHumiL, alarmPressH, alarmPressL, alarmEnabled);
         }
 
         // ==================== 设置持久化 ====================
@@ -691,6 +853,7 @@ namespace TempHumidityMonitor
             notifyIcon1.Dispose();
             SaveAllSettings();
             if (isComOpen) closeComPort();
+            try { apiService?.Shutdown(); } catch { }
             Application.Exit();
         }
 
@@ -703,6 +866,7 @@ namespace TempHumidityMonitor
                 return;
             }
             SaveAllSettings(); if (isComOpen) closeComPort();
+            try { apiService?.Shutdown(); } catch { }
         }
 
         // ==================== 辅助 ====================
@@ -738,6 +902,7 @@ namespace TempHumidityMonitor
             if (this.InvokeRequired)
                 this.BeginInvoke(new Action(() => { tsslError.Text = "错误: " + nError; tsslSend.Text = "发送: " + nSend; tsslRecv.Text = "接收: " + nReceive; }));
             else { tsslError.Text = "错误: " + nError; tsslSend.Text = "发送: " + nSend; tsslRecv.Text = "接收: " + nReceive; }
+            ApiService.UpdateCounters(nSend, nReceive, nError);
         }
 
         // ==================== Tab 切换 ====================

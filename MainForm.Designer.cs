@@ -16,7 +16,7 @@ namespace TempHumidityMonitor
 
         // ==================== 左侧控件 ====================
         private CheckBox chkSimMode;
-        private GroupBox gbSerial, gbCollect, gbAlarm, gbData;
+        private GroupBox gbSerial, gbWeb, gbCollect, gbAlarm, gbData;
         private ComboBox cbComPort, cbBaudRate, cbReadMode;
         private Button btnRefreshPorts, btnOpenCloseCom, btnManualSend;
         private Button btnExportCSV, btnClearChart, btnCleanDB;
@@ -26,6 +26,9 @@ namespace TempHumidityMonitor
         private NumericUpDown nudInterval, nudMaxPoints;
         private NumericUpDown nudTempHigh, nudTempLow, nudHumiHigh, nudHumiLow;
         private NumericUpDown nudPressureHigh, nudPressureLow;
+        private Label lblWebPort;
+        private NumericUpDown nudWebPort;
+        private Button btnOpenWeb;
         private Label lblTempValue, lblHumiValue, lblPressureValue, lblUpdateTime;
         private Label lblTempMin, lblTempMax, lblTempAvg;
         private Label lblHumiMin, lblHumiMax, lblHumiAvg;
@@ -77,6 +80,10 @@ namespace TempHumidityMonitor
             this.cbBaudRate = new System.Windows.Forms.ComboBox();
             this.btnOpenCloseCom = new System.Windows.Forms.Button();
             this.btnManualSend = new System.Windows.Forms.Button();
+            this.gbWeb = new System.Windows.Forms.GroupBox();
+            this.lblWebPort = new System.Windows.Forms.Label();
+            this.nudWebPort = new System.Windows.Forms.NumericUpDown();
+            this.btnOpenWeb = new System.Windows.Forms.Button();
             this.gbCollect = new System.Windows.Forms.GroupBox();
             this.lblReadMode = new System.Windows.Forms.Label();
             this.lblInterval = new System.Windows.Forms.Label();
@@ -164,6 +171,7 @@ namespace TempHumidityMonitor
             this.splitContainer1.Panel2.SuspendLayout();
             this.splitContainer1.SuspendLayout();
             this.gbSerial.SuspendLayout();
+            this.gbWeb.SuspendLayout();
             this.gbCollect.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudInterval)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudMaxPoints)).BeginInit();
@@ -176,6 +184,7 @@ namespace TempHumidityMonitor
             ((System.ComponentModel.ISupportInitialize)(this.nudPressureLow)).BeginInit();
             this.gbData.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudRetainDays)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.nudWebPort)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.gbCurrent.SuspendLayout();
             this.gbStatsTemp.SuspendLayout();
@@ -196,6 +205,7 @@ namespace TempHumidityMonitor
             // 
             this.splitContainer1.Panel1.Controls.Add(this.chkSimMode);
             this.splitContainer1.Panel1.Controls.Add(this.gbSerial);
+            this.splitContainer1.Panel1.Controls.Add(this.gbWeb);
             this.splitContainer1.Panel1.Controls.Add(this.gbCollect);
             this.splitContainer1.Panel1.Controls.Add(this.gbAlarm);
             this.splitContainer1.Panel1.Controls.Add(this.gbData);
@@ -212,8 +222,8 @@ namespace TempHumidityMonitor
             this.splitContainer1.Panel2.Controls.Add(this.gbStatsHumi);
             this.splitContainer1.Panel2.Controls.Add(this.gbStatsPress);
             this.splitContainer1.Panel2.Controls.Add(this.gbHistory);
-            this.splitContainer1.Size = new System.Drawing.Size(1222, 881);
-            this.splitContainer1.SplitterDistance = 407;
+            this.splitContainer1.Size = new System.Drawing.Size(1222, 877);
+            this.splitContainer1.SplitterDistance = 300;
             this.splitContainer1.TabIndex = 0;
             // 
             // chkSimMode
@@ -263,7 +273,7 @@ namespace TempHumidityMonitor
             this.cbComPort.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cbComPort.Location = new System.Drawing.Point(66, 22);
             this.cbComPort.Name = "cbComPort";
-            this.cbComPort.Size = new System.Drawing.Size(148, 20);
+            this.cbComPort.Size = new System.Drawing.Size(148, 23);
             this.cbComPort.TabIndex = 2;
             // 
             // btnRefreshPorts
@@ -286,7 +296,7 @@ namespace TempHumidityMonitor
             "115200"});
             this.cbBaudRate.Location = new System.Drawing.Point(66, 52);
             this.cbBaudRate.Name = "cbBaudRate";
-            this.cbBaudRate.Size = new System.Drawing.Size(210, 20);
+            this.cbBaudRate.Size = new System.Drawing.Size(210, 23);
             this.cbBaudRate.TabIndex = 4;
             // 
             // btnOpenCloseCom
@@ -304,16 +314,56 @@ namespace TempHumidityMonitor
             this.btnManualSend.Size = new System.Drawing.Size(110, 27);
             this.btnManualSend.TabIndex = 6;
             this.btnManualSend.Text = "手动采集";
-            // 
+            //
+            // gbWeb
+            //
+            this.gbWeb.Controls.Add(this.lblWebPort);
+            this.gbWeb.Controls.Add(this.nudWebPort);
+            this.gbWeb.Controls.Add(this.btnOpenWeb);
+            this.gbWeb.Location = new System.Drawing.Point(12, 162);
+            this.gbWeb.Name = "gbWeb";
+            this.gbWeb.Size = new System.Drawing.Size(280, 48);
+            this.gbWeb.TabIndex = 8;
+            this.gbWeb.TabStop = false;
+            this.gbWeb.Text = "网页监控";
+            //
+            // lblWebPort
+            //
+            this.lblWebPort.AutoSize = true;
+            this.lblWebPort.Location = new System.Drawing.Point(5, 17);
+            this.lblWebPort.Name = "lblWebPort";
+            this.lblWebPort.Size = new System.Drawing.Size(53, 15);
+            this.lblWebPort.TabIndex = 0;
+            this.lblWebPort.Text = "端口:";
+            //
+            // nudWebPort
+            //
+            this.nudWebPort.Location = new System.Drawing.Point(58, 14);
+            this.nudWebPort.Maximum = new decimal(new int[] { 65535, 0, 0, 0 });
+            this.nudWebPort.Minimum = new decimal(new int[] { 1024, 0, 0, 0 });
+            this.nudWebPort.Name = "nudWebPort";
+            this.nudWebPort.Size = new System.Drawing.Size(65, 25);
+            this.nudWebPort.TabIndex = 1;
+            this.nudWebPort.Value = new decimal(new int[] { 8090, 0, 0, 0 });
+            //
+            // btnOpenWeb
+            //
+            this.btnOpenWeb.Location = new System.Drawing.Point(133, 13);
+            this.btnOpenWeb.Name = "btnOpenWeb";
+            this.btnOpenWeb.Size = new System.Drawing.Size(135, 27);
+            this.btnOpenWeb.TabIndex = 2;
+            this.btnOpenWeb.Text = "打开网页面板";
+            this.btnOpenWeb.UseVisualStyleBackColor = true;
+            //
             // gbCollect
-            // 
+            //
             this.gbCollect.Controls.Add(this.lblReadMode);
             this.gbCollect.Controls.Add(this.lblInterval);
             this.gbCollect.Controls.Add(this.lblMaxPoints);
             this.gbCollect.Controls.Add(this.cbReadMode);
             this.gbCollect.Controls.Add(this.nudInterval);
             this.gbCollect.Controls.Add(this.nudMaxPoints);
-            this.gbCollect.Location = new System.Drawing.Point(12, 175);
+            this.gbCollect.Location = new System.Drawing.Point(12, 222);
             this.gbCollect.Name = "gbCollect";
             this.gbCollect.Size = new System.Drawing.Size(280, 105);
             this.gbCollect.TabIndex = 2;
@@ -363,7 +413,7 @@ namespace TempHumidityMonitor
             "一次读温湿压(整型)"});
             this.cbReadMode.Location = new System.Drawing.Point(68, 20);
             this.cbReadMode.Name = "cbReadMode";
-            this.cbReadMode.Size = new System.Drawing.Size(202, 20);
+            this.cbReadMode.Size = new System.Drawing.Size(202, 23);
             this.cbReadMode.TabIndex = 3;
             // 
             // nudInterval
@@ -385,7 +435,7 @@ namespace TempHumidityMonitor
             0,
             0});
             this.nudInterval.Name = "nudInterval";
-            this.nudInterval.Size = new System.Drawing.Size(202, 21);
+            this.nudInterval.Size = new System.Drawing.Size(202, 25);
             this.nudInterval.TabIndex = 4;
             this.nudInterval.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudInterval.Value = new decimal(new int[] {
@@ -413,7 +463,7 @@ namespace TempHumidityMonitor
             0,
             0});
             this.nudMaxPoints.Name = "nudMaxPoints";
-            this.nudMaxPoints.Size = new System.Drawing.Size(202, 21);
+            this.nudMaxPoints.Size = new System.Drawing.Size(202, 25);
             this.nudMaxPoints.TabIndex = 5;
             this.nudMaxPoints.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudMaxPoints.Value = new decimal(new int[] {
@@ -437,7 +487,7 @@ namespace TempHumidityMonitor
             this.gbAlarm.Controls.Add(this.nudHumiLow);
             this.gbAlarm.Controls.Add(this.nudPressureHigh);
             this.gbAlarm.Controls.Add(this.nudPressureLow);
-            this.gbAlarm.Location = new System.Drawing.Point(12, 310);
+            this.gbAlarm.Location = new System.Drawing.Point(12, 340);
             this.gbAlarm.Name = "gbAlarm";
             this.gbAlarm.Size = new System.Drawing.Size(280, 320);
             this.gbAlarm.TabIndex = 5;
@@ -526,7 +576,7 @@ namespace TempHumidityMonitor
             0,
             -2147483648});
             this.nudTempHigh.Name = "nudTempHigh";
-            this.nudTempHigh.Size = new System.Drawing.Size(202, 21);
+            this.nudTempHigh.Size = new System.Drawing.Size(202, 25);
             this.nudTempHigh.TabIndex = 7;
             this.nudTempHigh.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudTempHigh.Value = new decimal(new int[] {
@@ -555,7 +605,7 @@ namespace TempHumidityMonitor
             0,
             -2147483648});
             this.nudTempLow.Name = "nudTempLow";
-            this.nudTempLow.Size = new System.Drawing.Size(202, 21);
+            this.nudTempLow.Size = new System.Drawing.Size(202, 25);
             this.nudTempLow.TabIndex = 8;
             this.nudTempLow.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             // 
@@ -563,7 +613,7 @@ namespace TempHumidityMonitor
             // 
             this.nudHumiHigh.Location = new System.Drawing.Point(68, 138);
             this.nudHumiHigh.Name = "nudHumiHigh";
-            this.nudHumiHigh.Size = new System.Drawing.Size(202, 21);
+            this.nudHumiHigh.Size = new System.Drawing.Size(202, 25);
             this.nudHumiHigh.TabIndex = 9;
             this.nudHumiHigh.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudHumiHigh.Value = new decimal(new int[] {
@@ -576,7 +626,7 @@ namespace TempHumidityMonitor
             // 
             this.nudHumiLow.Location = new System.Drawing.Point(68, 178);
             this.nudHumiLow.Name = "nudHumiLow";
-            this.nudHumiLow.Size = new System.Drawing.Size(202, 21);
+            this.nudHumiLow.Size = new System.Drawing.Size(202, 25);
             this.nudHumiLow.TabIndex = 10;
             this.nudHumiLow.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudHumiLow.Value = new decimal(new int[] {
@@ -599,7 +649,7 @@ namespace TempHumidityMonitor
             0,
             0});
             this.nudPressureHigh.Name = "nudPressureHigh";
-            this.nudPressureHigh.Size = new System.Drawing.Size(202, 21);
+            this.nudPressureHigh.Size = new System.Drawing.Size(202, 25);
             this.nudPressureHigh.TabIndex = 11;
             this.nudPressureHigh.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudPressureHigh.Value = new decimal(new int[] {
@@ -622,7 +672,7 @@ namespace TempHumidityMonitor
             0,
             0});
             this.nudPressureLow.Name = "nudPressureLow";
-            this.nudPressureLow.Size = new System.Drawing.Size(202, 21);
+            this.nudPressureLow.Size = new System.Drawing.Size(202, 25);
             this.nudPressureLow.TabIndex = 12;
             this.nudPressureLow.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudPressureLow.Value = new decimal(new int[] {
@@ -639,7 +689,7 @@ namespace TempHumidityMonitor
             this.gbData.Controls.Add(this.lblRetainDays);
             this.gbData.Controls.Add(this.nudRetainDays);
             this.gbData.Controls.Add(this.btnCleanDB);
-            this.gbData.Location = new System.Drawing.Point(12, 660);
+            this.gbData.Location = new System.Drawing.Point(12, 672);
             this.gbData.Name = "gbData";
             this.gbData.Size = new System.Drawing.Size(280, 145);
             this.gbData.TabIndex = 6;
@@ -674,9 +724,9 @@ namespace TempHumidityMonitor
             // 
             // lblRetainDays
             // 
-            this.lblRetainDays.Location = new System.Drawing.Point(8, 103);
+            this.lblRetainDays.Location = new System.Drawing.Point(2, 107);
             this.lblRetainDays.Name = "lblRetainDays";
-            this.lblRetainDays.Size = new System.Drawing.Size(72, 22);
+            this.lblRetainDays.Size = new System.Drawing.Size(75, 15);
             this.lblRetainDays.TabIndex = 3;
             this.lblRetainDays.Text = "保留天数:";
             this.lblRetainDays.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
@@ -695,7 +745,7 @@ namespace TempHumidityMonitor
             0,
             0});
             this.nudRetainDays.Name = "nudRetainDays";
-            this.nudRetainDays.Size = new System.Drawing.Size(56, 21);
+            this.nudRetainDays.Size = new System.Drawing.Size(56, 25);
             this.nudRetainDays.TabIndex = 4;
             this.nudRetainDays.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
             this.nudRetainDays.Value = new decimal(new int[] {
@@ -706,16 +756,16 @@ namespace TempHumidityMonitor
             // 
             // btnCleanDB
             // 
-            this.btnCleanDB.Location = new System.Drawing.Point(149, 101);
+            this.btnCleanDB.Location = new System.Drawing.Point(154, 101);
             this.btnCleanDB.Name = "btnCleanDB";
             this.btnCleanDB.Size = new System.Drawing.Size(110, 27);
             this.btnCleanDB.TabIndex = 5;
             this.btnCleanDB.Text = "清理旧数据";
             this.btnCleanDB.UseVisualStyleBackColor = true;
-            // 
+            //
             // lblStatus
             // 
-            this.lblStatus.Location = new System.Drawing.Point(12, 778);
+            this.lblStatus.Location = new System.Drawing.Point(12, 828);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(280, 40);
             this.lblStatus.TabIndex = 7;
@@ -1176,7 +1226,7 @@ namespace TempHumidityMonitor
             this.dtpStart.Format = System.Windows.Forms.DateTimePickerFormat.Short;
             this.dtpStart.Location = new System.Drawing.Point(84, 22);
             this.dtpStart.Name = "dtpStart";
-            this.dtpStart.Size = new System.Drawing.Size(150, 21);
+            this.dtpStart.Size = new System.Drawing.Size(150, 25);
             this.dtpStart.TabIndex = 1;
             // 
             // lblEnd
@@ -1193,7 +1243,7 @@ namespace TempHumidityMonitor
             this.dtpEnd.Format = System.Windows.Forms.DateTimePickerFormat.Short;
             this.dtpEnd.Location = new System.Drawing.Point(318, 22);
             this.dtpEnd.Name = "dtpEnd";
-            this.dtpEnd.Size = new System.Drawing.Size(150, 21);
+            this.dtpEnd.Size = new System.Drawing.Size(150, 25);
             this.dtpEnd.TabIndex = 3;
             // 
             // btnQueryHistory
@@ -1233,6 +1283,7 @@ namespace TempHumidityMonitor
             this.dgvHistory.Name = "dgvHistory";
             this.dgvHistory.ReadOnly = true;
             this.dgvHistory.RowHeadersVisible = false;
+            this.dgvHistory.RowHeadersWidth = 51;
             this.dgvHistory.Size = new System.Drawing.Size(890, 724);
             this.dgvHistory.TabIndex = 6;
             // 
@@ -1245,39 +1296,39 @@ namespace TempHumidityMonitor
             this.tsslRecv,
             this.tsslError,
             this.tsslTime});
-            this.statusStrip1.Location = new System.Drawing.Point(0, 881);
+            this.statusStrip1.Location = new System.Drawing.Point(0, 877);
             this.statusStrip1.Name = "statusStrip1";
-            this.statusStrip1.Size = new System.Drawing.Size(1222, 22);
+            this.statusStrip1.Size = new System.Drawing.Size(1222, 26);
             this.statusStrip1.TabIndex = 1;
             // 
             // tsslStatus
             // 
             this.tsslStatus.Name = "tsslStatus";
-            this.tsslStatus.Size = new System.Drawing.Size(68, 17);
+            this.tsslStatus.Size = new System.Drawing.Size(84, 20);
             this.tsslStatus.Text = "串口未打开";
             // 
             // tsslSend
             // 
             this.tsslSend.Name = "tsslSend";
-            this.tsslSend.Size = new System.Drawing.Size(30, 17);
+            this.tsslSend.Size = new System.Drawing.Size(37, 20);
             this.tsslSend.Text = "发:0";
             // 
             // tsslRecv
             // 
             this.tsslRecv.Name = "tsslRecv";
-            this.tsslRecv.Size = new System.Drawing.Size(30, 17);
+            this.tsslRecv.Size = new System.Drawing.Size(37, 20);
             this.tsslRecv.Text = "收:0";
             // 
             // tsslError
             // 
             this.tsslError.Name = "tsslError";
-            this.tsslError.Size = new System.Drawing.Size(30, 17);
+            this.tsslError.Size = new System.Drawing.Size(37, 20);
             this.tsslError.Text = "错:0";
             // 
             // tsslTime
             // 
             this.tsslTime.Name = "tsslTime";
-            this.tsslTime.Size = new System.Drawing.Size(39, 17);
+            this.tsslTime.Size = new System.Drawing.Size(49, 20);
             this.tsslTime.Text = "00:00";
             // 
             // timer1
@@ -1293,12 +1344,13 @@ namespace TempHumidityMonitor
             this.notifyIcon1.DoubleClick += new System.EventHandler(this.notifyIcon1_DoubleClick);
             // 
             // cmsTray
-            // 
+            //
             this.cmsTray.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
                 new System.Windows.Forms.ToolStripMenuItem("显示窗口", null, new System.EventHandler(this.trayShow_Click)),
                 new System.Windows.Forms.ToolStripMenuItem("退出程序", null, new System.EventHandler(this.trayExit_Click))});
+            this.cmsTray.ImageScalingSize = new System.Drawing.Size(20, 20);
             this.cmsTray.Name = "cmsTray";
-            this.cmsTray.Size = new System.Drawing.Size(125, 48);
+            this.cmsTray.Size = new System.Drawing.Size(139, 52);
             // 
             // MainForm
             // 
@@ -1314,6 +1366,8 @@ namespace TempHumidityMonitor
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
             this.splitContainer1.ResumeLayout(false);
             this.gbSerial.ResumeLayout(false);
+            this.gbWeb.ResumeLayout(false);
+            this.gbWeb.PerformLayout();
             this.gbCollect.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.nudInterval)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudMaxPoints)).EndInit();
@@ -1325,7 +1379,9 @@ namespace TempHumidityMonitor
             ((System.ComponentModel.ISupportInitialize)(this.nudPressureHigh)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.nudPressureLow)).EndInit();
             this.gbData.ResumeLayout(false);
+            this.gbData.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudRetainDays)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.nudWebPort)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).EndInit();
             this.gbCurrent.ResumeLayout(false);
             this.gbStatsTemp.ResumeLayout(false);
@@ -1367,7 +1423,6 @@ namespace TempHumidityMonitor
             this.btnQueryHistory.Click += btnQueryHistory_Click;
             this.btnExportHistory.Click += btnExportHistory_Click;
             this.btnCleanDB.Click += btnCleanDB_Click;
-
         }
 
         private Label lblPortLabel;

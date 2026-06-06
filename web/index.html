@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>温湿度监控面板 - TempHumidityMonitor</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --color-temp: #e53e3e;
+  --color-humi: #3182ce;
+  --color-press: #38a169;
+  --color-warn: #dd6b20;
+  --color-error: #c53030;
+  --bg-page: #f7fafc;
+  --bg-card: #ffffff;
+  --text-primary: #1a202c;
+  --text-secondary: #718096;
+  --border: #e2e8f0;
+  --radius: 0.75rem;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.1);
+  --font: system-ui, -apple-system, "Microsoft YaHei", sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg-page);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+}
+
+/* ===== Alarm Banner ===== */
+.alarm-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: var(--color-error); color: #fff;
+  padding: 12px 24px; transform: translateY(-100%);
+  transition: transform 0.4s ease;
+  display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 4px 12px rgba(197,48,48,0.4);
+  font-weight: 600; font-size: 0.95rem;
+}
+.alarm-banner.show { transform: translateY(0); }
+.alarm-banner .close-banner {
+  background: none; border: none; color: #fff;
+  font-size: 1.4rem; cursor: pointer; padding: 0 8px; line-height: 1;
+}
+
+/* ===== Top Status Bar ===== */
+.status-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 24px; background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow); flex-wrap: wrap;
+}
+.status-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.status-dot.online  { background: #38a169; box-shadow: 0 0 6px #38a169; }
+.status-dot.offline { background: #a0aec0; }
+.status-dot.sim     { background: var(--color-warn); box-shadow: 0 0 6px var(--color-warn); }
+.status-text { font-size: 0.875rem; color: var(--text-secondary); }
+
+.status-counters {
+  display: flex; gap: 14px; font-size: 0.78rem; color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.status-counters .sc-send { color: #3182ce; }
+.status-counters .sc-recv { color: #38a169; }
+.status-counters .sc-err  { color: var(--color-error); }
+.status-counters .sc-err.has-error { font-weight: 700; }
+
+.status-clock { margin-left: auto; font-size: 0.875rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.alarm-badge {
+  background: var(--color-error); color: #fff; border-radius: 50%;
+  width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; opacity: 0; transition: opacity 0.3s;
+}
+.alarm-badge.has-alarms { opacity: 1; }
+
+/* ===== Main Content ===== */
+.main-content {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px; padding: 20px 24px; flex: 1; min-height: 0;
+}
+.left-col { display: flex; flex-direction: column; gap: 16px; }
+.right-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* ===== Dashboard Cards ===== */
+.card {
+  background: var(--bg-card); border-radius: var(--radius);
+  padding: 18px 22px; box-shadow: var(--shadow);
+  border: 2px solid transparent; transition: border-color 0.3s, box-shadow 0.3s;
+}
+.card.alarm-active { animation: alarm-pulse 0.8s ease-in-out infinite; }
+.card-temp  { border-left: 4px solid var(--color-temp); }
+.card-temp.alarm-active  { border-color: var(--color-temp); }
+.card-humi  { border-left: 4px solid var(--color-humi); }
+.card-humi.alarm-active  { border-color: var(--color-humi); }
+.card-press { border-left: 4px solid var(--color-press); }
+.card-press.alarm-active { border-color: var(--color-press); }
+
+@keyframes alarm-pulse {
+  0%, 100% { box-shadow: var(--shadow); }
+  50% { box-shadow: 0 0 0 3px rgba(229,62,62,0.35), var(--shadow-lg); }
+}
+
+.card-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;
+}
+.card-label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; }
+.card-unit  { font-size: 0.8rem; color: var(--text-secondary); }
+.card-value { font-size: 2.6rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.card-temp  .card-value { color: var(--color-temp); }
+.card-humi  .card-value { color: var(--color-humi); }
+.card-press .card-value { color: var(--color-press); }
+.card-thresholds {
+  display: flex; justify-content: space-between;
+  margin-top: 8px; font-size: 0.75rem; color: var(--text-secondary);
+}
+.card-thresholds .th-label { opacity: 0.7; }
+.card-thresholds .th-hi { color: var(--color-error); }
+.card-thresholds .th-lo { color: #3182ce; }
+
+/* ===== Stats Panel ===== */
+.stats-panel { background: var(--bg-card); border-radius: var(--radius); box-shadow: var(--shadow); }
+.stats-header {
+  padding: 12px 22px; font-size: 0.85rem; font-weight: 600;
+  color: var(--text-secondary); border-bottom: 1px solid var(--border);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.stats-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  padding: 10px 16px 12px; gap: 6px;
+}
+.stats-cell { text-align: center; padding: 4px 2px; }
+.stats-cell .st-label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+.stats-cell .st-value { font-size: 0.95rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stats-cell.temp .st-value { color: var(--color-temp); }
+.stats-cell.humi .st-value { color: var(--color-humi); }
+.stats-cell.press .st-value { color: var(--color-press); }
+.stats-cell .st-count {
+  font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;
+  padding-top: 4px; border-top: 1px solid var(--border);
+}
+
+/* ===== Chart ===== */
+.chart-container {
+  background: var(--bg-card); border-radius: var(--radius);
+  padding: 16px; box-shadow: var(--shadow);
+  flex: 1; min-height: 360px;
+}
+.chart-box { width: 100%; height: 100%; min-height: 340px; }
+
+/* ===== History Panel ===== */
+.history-panel {
+  background: var(--bg-card); border-radius: var(--radius);
+  padding: 20px 24px; box-shadow: var(--shadow);
+}
+.history-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.history-header h3 { font-size: 0.95rem; margin-right: auto; }
+.history-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.history-controls input[type="datetime-local"] {
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 10px; font-size: 0.85rem; font-family: var(--font);
+  color: var(--text-primary); background: #fff;
+}
+.history-controls label { font-size: 0.82rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+.btn {
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 16px; font-size: 0.85rem; font-family: var(--font);
+  cursor: pointer; background: #fff; color: var(--text-primary);
+  transition: all 0.2s; font-weight: 500;
+}
+.btn:hover { background: #edf2f7; }
+.btn-primary { background: #3182ce; color: #fff; border-color: #3182ce; }
+.btn-primary:hover { background: #2b6cb0; }
+.btn-export { background: #38a169; color: #fff; border-color: #38a169; }
+.btn-export:hover { background: #2f855a; }
+.btn-sm { padding: 4px 10px; font-size: 0.78rem; }
+
+.table-wrapper { overflow-x: auto; max-height: 300px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+thead { position: sticky; top: 0; background: #f7fafc; z-index: 1; }
+th {
+  text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border);
+  font-weight: 600; color: var(--text-secondary); font-size: 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+tr.alarm-row { background: #fff5f5; }
+tr.alarm-row td:first-child::before { content: '\26A0 '; }
+
+.pagination {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; margin-top: 12px; font-size: 0.85rem;
+}
+.pagination .page-info { color: var(--text-secondary); }
+.pagination .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ===== Config Panel ===== */
+.config-panel {
+  background: var(--bg-card); border-top: 1px solid var(--border);
+  box-shadow: 0 -1px 3px rgba(0,0,0,0.05);
+}
+.config-toggle {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 24px; cursor: pointer; font-size: 0.875rem;
+  font-weight: 600; color: var(--text-secondary); user-select: none;
+  border: none; background: none; width: 100%; text-align: left;
+  font-family: var(--font);
+}
+.config-toggle:hover { color: var(--text-primary); }
+.config-toggle .arrow { transition: transform 0.3s; font-size: 0.7rem; }
+.config-toggle.open .arrow { transform: rotate(90deg); }
+.config-body {
+  display: none; padding: 0 24px 20px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;
+}
+.config-body.open { display: grid; }
+.config-group h4 {
+  font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-secondary); margin-bottom: 8px;
+}
+.config-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.config-row label { font-size: 0.82rem; min-width: 55px; color: var(--text-primary); }
+.config-row input[type="number"] {
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 4px 8px; width: 80px; font-size: 0.82rem; font-family: var(--font);
+}
+.config-row input[type="range"] { flex: 1; accent-color: #3182ce; }
+.config-row .unit { font-size: 0.75rem; color: var(--text-secondary); width: 28px; }
+
+/* ===== Responsive ===== */
+@media (max-width: 960px) {
+  .main-content { grid-template-columns: 1fr; }
+  .left-col { flex-direction: row; flex-wrap: wrap; }
+  .left-col .card { flex: 1; min-width: 160px; }
+  .stats-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 560px) {
+  .status-bar { padding: 8px 12px; gap: 6px; }
+  .status-counters { gap: 8px; font-size: 0.7rem; }
+  .main-content { padding: 10px; gap: 10px; }
+  .card { padding: 12px 14px; }
+  .card-value { font-size: 1.8rem; }
+  .left-col { flex-direction: column; }
+  .history-header { flex-direction: column; align-items: flex-start; }
+  .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 3px; }
+  .stats-cell .st-value { font-size: 0.8rem; }
+}
+</style>
+</head>
+<body>
+
+<div id="alarmBanner" class="alarm-banner">
+  <span id="alarmBannerMsg"></span>
+  <button class="close-banner" onclick="dismissBanner()">&times;</button>
+</div>
+
+<header class="status-bar">
+  <span class="status-dot sim" id="statusDot"></span>
+  <span class="status-text" id="statusText">检测后端...</span>
+  <span class="status-counters">
+    <span class="sc-send" id="scSend">发送: 0</span>
+    <span class="sc-recv" id="scRecv">接收: 0</span>
+    <span class="sc-err" id="scErr">错误: 0</span>
+  </span>
+  <span class="alarm-badge" id="alarmBadge">0</span>
+  <span class="status-clock" id="statusClock">--</span>
+</header>
+
+<div class="main-content">
+  <div class="left-col">
+    <div class="card card-temp" id="cardTemp">
+      <div class="card-header"><span class="card-label">温度</span><span class="card-unit">&deg;C</span></div>
+      <div class="card-value" id="valTemp">--</div>
+      <div class="card-thresholds">
+        <span><span class="th-label">下限</span> <span class="th-lo" id="thTempLo">0.0</span></span>
+        <span><span class="th-label">上限</span> <span class="th-hi" id="thTempHi">40.0</span></span>
+      </div>
+    </div>
+    <div class="card card-humi" id="cardHumi">
+      <div class="card-header"><span class="card-label">湿度</span><span class="card-unit">%</span></div>
+      <div class="card-value" id="valHumi">--</div>
+      <div class="card-thresholds">
+        <span><span class="th-label">下限</span> <span class="th-lo" id="thHumiLo">20.0</span></span>
+        <span><span class="th-label">上限</span> <span class="th-hi" id="thHumiHi">80.0</span></span>
+      </div>
+    </div>
+    <div class="card card-press" id="cardPress">
+      <div class="card-header"><span class="card-label">气压</span><span class="card-unit">kPa</span></div>
+      <div class="card-value" id="valPress">--</div>
+      <div class="card-thresholds">
+        <span><span class="th-label">下限</span> <span class="th-lo" id="thPressLo">90.0</span></span>
+        <span><span class="th-label">上限</span> <span class="th-hi" id="thPressHi">110.0</span></span>
+      </div>
+    </div>
+
+    <!-- Statistics Panel -->
+    <div class="stats-panel" id="statsPanel">
+      <div class="stats-header">统计数据 <span style="font-weight:400;font-size:0.75rem;margin-left:4px;" id="stCount">(0 条)</span></div>
+      <div class="stats-grid">
+        <div class="stats-cell temp"><div class="st-label">最低</div><div class="st-value" id="stTMin">--</div></div>
+        <div class="stats-cell temp"><div class="st-label">最高</div><div class="st-value" id="stTMax">--</div></div>
+        <div class="stats-cell temp"><div class="st-label">平均</div><div class="st-value" id="stTAvg">--</div></div>
+        <div class="stats-cell humi"><div class="st-label">最低</div><div class="st-value" id="stHMin">--</div></div>
+        <div class="stats-cell humi"><div class="st-label">最高</div><div class="st-value" id="stHMax">--</div></div>
+        <div class="stats-cell humi"><div class="st-label">平均</div><div class="st-value" id="stHAvg">--</div></div>
+        <div class="stats-cell press"><div class="st-label">最低</div><div class="st-value" id="stPMin">--</div></div>
+        <div class="stats-cell press"><div class="st-label">最高</div><div class="st-value" id="stPMax">--</div></div>
+        <div class="stats-cell press"><div class="st-label">平均</div><div class="st-value" id="stPAvg">--</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-col">
+    <div class="chart-container"><div class="chart-box" id="chartMain"></div></div>
+
+    <div class="history-panel">
+      <div class="history-header">
+        <h3>历史数据查询</h3>
+        <div class="history-controls">
+          <input type="datetime-local" id="hStart">
+          <span style="color:var(--text-secondary)">至</span>
+          <input type="datetime-local" id="hEnd">
+          <label><input type="checkbox" id="hAlarmOnly" style="accent-color:#c53030;"> 仅报警</label>
+          <button class="btn btn-primary" onclick="queryHistory()">查询</button>
+          <button class="btn btn-export" onclick="exportCSV()">导出 CSV</button>
+          <button class="btn btn-sm" onclick="clearChart()" title="清除图表和统计数据">清除</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>时间</th><th>温度 (&deg;C)</th><th>湿度 (%)</th><th>气压 (kPa)</th><th>报警</th></tr></thead>
+          <tbody id="historyBody">
+            <tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:24px;">点击"查询"加载历史数据</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+</div>
+
+<div class="config-panel">
+  <button class="config-toggle" id="configToggle" onclick="toggleConfig()">
+    <span class="arrow">&#9654;</span> 配置面板
+  </button>
+  <div class="config-body" id="configBody">
+    <div class="config-group">
+      <h4>报警阈值</h4>
+      <div class="config-row"><label>温度上限</label><input type="number" id="cfgTempHi" value="40" step="0.5"><span class="unit">&deg;C</span></div>
+      <div class="config-row"><label>温度下限</label><input type="number" id="cfgTempLo" value="0" step="0.5"><span class="unit">&deg;C</span></div>
+      <div class="config-row"><label>湿度上限</label><input type="number" id="cfgHumiHi" value="80" step="1"><span class="unit">%</span></div>
+      <div class="config-row"><label>湿度下限</label><input type="number" id="cfgHumiLo" value="20" step="1"><span class="unit">%</span></div>
+      <div class="config-row"><label>气压上限</label><input type="number" id="cfgPressHi" value="110" step="0.5"><span class="unit">kPa</span></div>
+      <div class="config-row"><label>气压下限</label><input type="number" id="cfgPressLo" value="90" step="0.5"><span class="unit">kPa</span></div>
+    </div>
+    <div class="config-group">
+      <h4>系统设置</h4>
+      <div class="config-row">
+        <label>刷新间隔</label>
+        <input type="range" id="cfgInterval" min="1" max="60" value="3" oninput="document.getElementById('cfgIntervalVal').textContent=this.value+'s'">
+        <span class="unit" id="cfgIntervalVal" style="width:auto">3s</span>
+      </div>
+      <div class="config-row"><label>启用报警</label><input type="checkbox" id="cfgAlarmEnabled" checked style="accent-color:#3182ce;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Backend Detection
+// ============================================================
+var API_BASE = (window.location.origin.match(/^https?:\/\/localhost/)) ? '' : 'http://localhost:8090';
+var backendAvailable = false;
+var eventSource = null;
+var lastAlarmState = null;
+var statsInterval = null;
+
+// ============================================================
+// API Layer
+// ============================================================
+var api = {
+  fetchCurrent: function() {
+    if (backendAvailable) {
+      return fetch(API_BASE + '/api/current')
+        .then(function(r) { if (r.ok) return r.json(); throw new Error('fail'); })
+        .catch(function() { return generateMockData(); });
+    }
+    return Promise.resolve(generateMockData());
+  },
+  fetchHistory: function(startISO, endISO, alarmOnly) {
+    if (backendAvailable) {
+      var url = API_BASE + '/api/history?start=' + encodeURIComponent(startISO) + '&end=' + encodeURIComponent(endISO);
+      if (alarmOnly) url += '&alarmOnly=1';
+      return fetch(url)
+        .then(function(r) { if (r.ok) return r.json(); throw new Error('fail'); })
+        .then(function(rows) {
+          return rows.map(function(r) {
+            return {
+              temperature: parseFloat(r.temperature), humidity: parseFloat(r.humidity),
+              pressure: parseFloat(r.pressure), timestamp: r.timestamp,
+              alarm: r.isAlarm, alarmMsg: r.alarmMsg || ''
+            };
+          });
+        })
+        .catch(function() { return queryMockHistory(startISO, endISO); });
+    }
+    return Promise.resolve(queryMockHistory(startISO, endISO));
+  },
+  fetchStatus: function() {
+    return fetch(API_BASE + '/api/status')
+      .then(function(r) { if (r.ok) return r.json(); throw new Error('fail'); })
+      .catch(function() { return { connected: false, mode: 'standalone' }; });
+  },
+  fetchStats: function() {
+    if (!backendAvailable) return Promise.resolve(null);
+    return fetch(API_BASE + '/api/stats')
+      .then(function(r) { if (r.ok) return r.json(); return null; })
+      .catch(function() { return null; });
+  },
+  fetchThresholds: function() {
+    return fetch(API_BASE + '/api/thresholds')
+      .then(function(r) { if (r.ok) return r.json(); throw new Error('fail'); })
+      .catch(function() { return null; });
+  }
+};
+
+// ============================================================
+// Configuration
+// ============================================================
+var config = {
+  tempHi: 40.0, tempLo: 0.0,
+  humiHi: 80,  humiLo: 20,
+  pressHi: 110, pressLo: 90,
+  interval: 3, alarmEnabled: true
+};
+
+// ============================================================
+// Data State
+// ============================================================
+var MAX_CHART_POINTS = 60;
+var dataBuffer = [];
+var chartTimestamps = [];
+var chartTemp = [];
+var chartHumi = [];
+var chartPress = [];
+var alarmCount = 0;
+var alarmBannerTimer = null;
+var historyPage = 0;
+var HISTORY_PAGE_SIZE = 50;
+var historyResult = [];
+
+// ============================================================
+// SSE
+// ============================================================
+function sseConnect() {
+  if (eventSource) { eventSource.close(); eventSource = null; }
+  if (!backendAvailable) return;
+  try {
+    eventSource = new EventSource(API_BASE + '/api/stream');
+    eventSource.addEventListener('connected', function() { updateStatusBar('online', 'SSE connected'); });
+    eventSource.addEventListener('data', function(e) {
+      try { handleRealtimeData(JSON.parse(e.data)); } catch(err) {}
+    });
+    eventSource.onerror = function() { updateStatusBar('reconnecting', 'SSE reconnecting...'); };
+  } catch(e) {}
+}
+
+function handleRealtimeData(data) {
+  var alarms = checkAlarms(data);
+  var record = {
+    temperature: data.temperature, humidity: data.humidity, pressure: data.pressure,
+    timestamp: data.timestamp, alarm: alarms.any, alarmMsg: alarms.msg || '',
+    isSimulated: data.isSimulated
+  };
+  dataBuffer.push(record);
+  if (dataBuffer.length > 5000) dataBuffer.shift();
+
+  var dt = new Date(data.timestamp);
+  chartTimestamps.push(dt.toLocaleString('zh-CN', { hour12: false }));
+  chartTemp.push(data.temperature);
+  chartHumi.push(data.humidity);
+  chartPress.push(data.pressure);
+  while (chartTimestamps.length > MAX_CHART_POINTS) {
+    chartTimestamps.shift(); chartTemp.shift(); chartHumi.shift(); chartPress.shift();
+  }
+
+  updateCards(data, alarms);
+  updateChart();
+  updateThresholdLines();
+
+  if (alarms.any && !lastAlarmState) { showAlarmBanner(alarms); }
+  lastAlarmState = alarms.any;
+
+  updateStatusBar(data.isSimulated ? 'simulation' : 'online',
+    data.isSimulated ? 'simulation' : 'online');
+}
+
+// ============================================================
+// Statistics poll
+// ============================================================
+function pollStats() {
+  api.fetchStats().then(function(stats) {
+    if (!stats || stats.count === 0) return;
+    document.getElementById('stCount').textContent = '(' + stats.count + ' 条)';
+    document.getElementById('stTMin').textContent = stats.tempMin + ' \xB0C';
+    document.getElementById('stTMax').textContent = stats.tempMax + ' \xB0C';
+    document.getElementById('stTAvg').textContent = stats.tempAvg + ' \xB0C';
+    document.getElementById('stHMin').textContent = stats.humiMin + ' %';
+    document.getElementById('stHMax').textContent = stats.humiMax + ' %';
+    document.getElementById('stHAvg').textContent = stats.humiAvg + ' %';
+    document.getElementById('stPMin').textContent = stats.pressMin + ' kPa';
+    document.getElementById('stPMax').textContent = stats.pressMax + ' kPa';
+    document.getElementById('stPAvg').textContent = stats.pressAvg + ' kPa';
+  });
+}
+
+function clearChart() {
+  chartTimestamps = []; chartTemp = []; chartHumi = []; chartPress = [];
+  dataBuffer = [];
+  alarmCount = 0; lastAlarmState = null;
+  document.getElementById('alarmBadge').textContent = '0';
+  document.getElementById('alarmBadge').classList.remove('has-alarms');
+  ['valTemp','valHumi','valPress'].forEach(function(id) { document.getElementById(id).textContent = '--'; });
+  ['stTMin','stTMax','stTAvg','stHMin','stHMax','stHAvg','stPMin','stPMax','stPAvg'].forEach(function(id) { document.getElementById(id).textContent = '--'; });
+  document.getElementById('stCount').textContent = '(0 条)';
+  updateChart();
+}
+
+// ============================================================
+// Mock Data (fallback)
+// ============================================================
+function generateMockData() {
+  var now = new Date();
+  var last = dataBuffer.length > 0 ? dataBuffer[dataBuffer.length - 1] : null;
+  var t = last ? last.temperature : 25.0;
+  var h = last ? last.humidity : 55.0;
+  var p = last ? last.pressure : 101.3;
+  t += (Math.random() - 0.5) * 1.2;
+  h += (Math.random() - 0.5) * 2.5;
+  p += (Math.random() - 0.5) * 0.4;
+  if (Math.random() < 0.08) {
+    var c = Math.random();
+    if (c < 0.33) t = config.tempHi + Math.random() * 5;
+    else if (c < 0.5) t = config.tempLo - Math.random() * 3;
+    else if (c < 0.75) h = config.humiHi + Math.random() * 10;
+    else if (c < 0.9) h = config.humiLo - Math.random() * 8;
+    else p = config.pressHi + Math.random() * 3;
+  }
+  t = Math.round(Math.max(-40, Math.min(85, t)) * 10) / 10;
+  h = Math.round(Math.max(0, Math.min(100, h)) * 10) / 10;
+  p = Math.round(Math.max(80, Math.min(120, p)) * 10) / 10;
+  return { temperature: t, humidity: h, pressure: p, timestamp: now.toISOString(), isSimulated: true };
+}
+
+function queryMockHistory(startISO, endISO) {
+  var start = new Date(startISO).getTime(), end = new Date(endISO).getTime();
+  return dataBuffer.filter(function(d) { var t = new Date(d.timestamp).getTime(); return t >= start && t <= end; });
+}
+
+// ============================================================
+// ECharts (with threshold markLines)
+// ============================================================
+var chart = null;
+
+function initChart() {
+  var dom = document.getElementById('chartMain');
+  chart = echarts.init(dom);
+  var option = {
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(26,32,44,0.92)', borderColor: 'transparent',
+      textStyle: { color: '#fff', fontSize: 13, fontFamily: 'system-ui, "Microsoft YaHei", sans-serif' },
+      formatter: function(params) {
+        var html = '<div style="font-weight:600;margin-bottom:4px">' + params[0].axisValue + '</div>';
+        params.forEach(function(p) {
+          var unit = (p.seriesName.match(/\((.+?)\)/) || ['',''])[1];
+          html += '<div style="display:flex;align-items:center;gap:6px;margin:2px 0">'
+            + '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + p.color + '"></span>'
+            + p.seriesName + ': <b>' + p.value + ' ' + unit + '</b></div>';
+        });
+        return html;
+      }
+    },
+    legend: { data: ['温度 (°C)', '湿度 (%)', '气压 (kPa)'], bottom: 0, textStyle: { fontSize: 12 } },
+    grid: { top: 10, right: 75, bottom: 40, left: 55 },
+    xAxis: {
+      type: 'category', boundaryGap: false, data: chartTimestamps,
+      axisLabel: { fontSize: 11, color: '#718096', formatter: function(v) { return v.length > 19 ? v.slice(11, 19) : v; } },
+      axisLine: { lineStyle: { color: '#e2e8f0' } }
+    },
+    yAxis: [
+      {
+        type: 'value', name: '\xB0C / %', nameTextStyle: { fontSize: 11, color: '#718096' },
+        min: function(v) { return Math.floor(Math.min(v.min, config.tempLo - 5, config.humiLo - 5)); },
+        max: function(v) { return Math.ceil(Math.max(v.max, config.tempHi + 5, config.humiHi + 5)); },
+        axisLabel: { fontSize: 11, color: '#718096' },
+        splitLine: { lineStyle: { color: '#edf2f7' } }
+      },
+      {
+        type: 'value', name: 'kPa', nameTextStyle: { fontSize: 11, color: '#718096' },
+        min: function(v) { return Math.floor(Math.min(v.min, config.pressLo - 5)); },
+        max: function(v) { return Math.ceil(Math.max(v.max, config.pressHi + 5)); },
+        axisLabel: { fontSize: 11, color: '#718096' },
+        splitLine: { show: false }
+      }
+    ],
+    series: [
+      {
+        name: '温度 (°C)', type: 'line', yAxisIndex: 0,
+        data: chartTemp, smooth: true, symbol: 'none',
+        lineStyle: { color: '#e53e3e', width: 2 },
+        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(229,62,62,0.12)' }, { offset: 1, color: 'rgba(229,62,62,0)' }
+        ]) },
+        markLine: {
+          silent: true, symbol: 'none',
+          lineStyle: { type: 'dashed', color: '#e53e3e', width: 1, opacity: 0.6 },
+          label: { fontSize: 10, color: '#e53e3e', formatter: '{c} \xB0C' },
+          data: [{ yAxis: config.tempHi, label: { formatter: '上限 {c}' } },
+                 { yAxis: config.tempLo, label: { formatter: '下限 {c}' } }]
+        }
+      },
+      {
+        name: '湿度 (%)', type: 'line', yAxisIndex: 0,
+        data: chartHumi, smooth: true, symbol: 'none',
+        lineStyle: { color: '#3182ce', width: 2 },
+        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(49,130,206,0.12)' }, { offset: 1, color: 'rgba(49,130,206,0)' }
+        ]) },
+        markLine: {
+          silent: true, symbol: 'none',
+          lineStyle: { type: 'dashed', color: '#3182ce', width: 1, opacity: 0.6 },
+          label: { fontSize: 10, color: '#3182ce', formatter: '{c} %' },
+          data: [{ yAxis: config.humiHi }, { yAxis: config.humiLo }]
+        }
+      },
+      {
+        name: '气压 (kPa)', type: 'line', yAxisIndex: 1,
+        data: chartPress, smooth: true, symbol: 'none',
+        lineStyle: { color: '#38a169', width: 2 },
+        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(56,161,105,0.12)' }, { offset: 1, color: 'rgba(56,161,105,0)' }
+        ]) },
+        markLine: {
+          silent: true, symbol: 'none',
+          lineStyle: { type: 'dashed', color: '#38a169', width: 1, opacity: 0.6 },
+          label: { fontSize: 10, color: '#38a169', formatter: '{c} kPa' },
+          data: [{ yAxis: config.pressHi }, { yAxis: config.pressLo }]
+        }
+      }
+    ]
+  };
+  chart.setOption(option);
+  window.addEventListener('resize', function() { chart && chart.resize(); });
+}
+
+function updateChart() {
+  if (!chart) return;
+  chart.setOption({
+    xAxis: { data: chartTimestamps },
+    series: [{ data: chartTemp }, { data: chartHumi }, { data: chartPress }]
+  });
+}
+
+function updateThresholdLines() {
+  if (!chart) return;
+  chart.setOption({
+    series: [
+      { markLine: { data: [{ yAxis: config.tempHi }, { yAxis: config.tempLo }] } },
+      { markLine: { data: [{ yAxis: config.humiHi }, { yAxis: config.humiLo }] } },
+      { markLine: { data: [{ yAxis: config.pressHi }, { yAxis: config.pressLo }] } }
+    ]
+  });
+}
+
+// ============================================================
+// Dashboard Cards
+// ============================================================
+function updateCards(data, alarms) {
+  document.getElementById('valTemp').textContent = data.temperature.toFixed(1);
+  document.getElementById('valHumi').textContent = data.humidity.toFixed(1);
+  document.getElementById('valPress').textContent = data.pressure.toFixed(1);
+  document.getElementById('thTempHi').textContent = config.tempHi.toFixed(1);
+  document.getElementById('thTempLo').textContent = config.tempLo.toFixed(1);
+  document.getElementById('thHumiHi').textContent = config.humiHi.toFixed(1);
+  document.getElementById('thHumiLo').textContent = config.humiLo.toFixed(1);
+  document.getElementById('thPressHi').textContent = config.pressHi.toFixed(1);
+  document.getElementById('thPressLo').textContent = config.pressLo.toFixed(1);
+  document.getElementById('cardTemp').classList.toggle('alarm-active', alarms && (alarms.tempHigh || alarms.tempLow));
+  document.getElementById('cardHumi').classList.toggle('alarm-active', alarms && (alarms.humiHigh || alarms.humiLow));
+  document.getElementById('cardPress').classList.toggle('alarm-active', alarms && (alarms.pressHigh || alarms.pressLow));
+}
+
+// ============================================================
+// Alarm Banner
+// ============================================================
+function showAlarmBanner(alarms) {
+  var parts = [];
+  if (alarms.tempHigh) parts.push('温度过高');
+  if (alarms.tempLow)  parts.push('温度过低');
+  if (alarms.humiHigh) parts.push('湿度过高');
+  if (alarms.humiLow)  parts.push('湿度过低');
+  if (alarms.pressHigh) parts.push('气压过高');
+  if (alarms.pressLow)  parts.push('气压过低');
+  if (parts.length === 0) return;
+  document.getElementById('alarmBannerMsg').textContent = '报警: ' + parts.join('; ');
+  document.getElementById('alarmBanner').classList.add('show');
+  alarmCount++;
+  var badge = document.getElementById('alarmBadge');
+  badge.textContent = alarmCount > 99 ? '99+' : alarmCount;
+  badge.classList.add('has-alarms');
+  if (alarmBannerTimer) clearTimeout(alarmBannerTimer);
+  alarmBannerTimer = setTimeout(dismissBanner, 5000);
+}
+
+function dismissBanner() {
+  document.getElementById('alarmBanner').classList.remove('show');
+  if (alarmBannerTimer) { clearTimeout(alarmBannerTimer); alarmBannerTimer = null; }
+}
+
+// ============================================================
+// Status Bar
+// ============================================================
+function updateStatusBar(mode, text) {
+  var dot = document.getElementById('statusDot');
+  var txt = document.getElementById('statusText');
+  dot.className = 'status-dot';
+  if (mode === 'simulation') { dot.classList.add('sim'); txt.textContent = text || '模拟模式运行中'; }
+  else if (mode === 'online') { dot.classList.add('online'); txt.textContent = text || '设备在线 \xB7 实时数据'; }
+  else if (mode === 'reconnecting') { dot.classList.add('sim'); txt.textContent = text || '重连中...'; }
+  else { dot.classList.add('offline'); txt.textContent = text || '后端离线 \xB7 本地模拟'; }
+}
+
+function updateCounters(send, recv, err) {
+  document.getElementById('scSend').textContent = '发送: ' + send;
+  document.getElementById('scRecv').textContent = '接收: ' + recv;
+  var errEl = document.getElementById('scErr');
+  errEl.textContent = '错误: ' + err;
+  errEl.classList.toggle('has-error', err > 0);
+}
+
+function updateClock() {
+  var now = new Date();
+  document.getElementById('statusClock').textContent =
+    now.toLocaleString('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ============================================================
+// History Query
+// ============================================================
+function queryHistory() {
+  var startEl = document.getElementById('hStart');
+  var endEl = document.getElementById('hEnd');
+  var alarmOnly = document.getElementById('hAlarmOnly').checked;
+  var startISO, endISO;
+  if (startEl.value && endEl.value) {
+    startISO = new Date(startEl.value).toISOString();
+    endISO = new Date(endEl.value).toISOString();
+  } else {
+    var now = new Date();
+    endISO = now.toISOString();
+    now.setHours(now.getHours() - 1);
+    startISO = now.toISOString();
+    startEl.value = startISO.slice(0, 16);
+    endEl.value = endISO.slice(0, 16);
+  }
+  api.fetchHistory(startISO, endISO, alarmOnly).then(function(result) {
+    historyResult = result;
+    historyResult.sort(function(a, b) { return new Date(b.timestamp) - new Date(a.timestamp); });
+    historyPage = 0;
+    renderHistoryTable();
+  }).catch(function(err) { console.error('History query failed:', err); });
+}
+
+function renderHistoryTable() {
+  var tbody = document.getElementById('historyBody');
+  var start = historyPage * HISTORY_PAGE_SIZE;
+  var pageData = historyResult.slice(start, start + HISTORY_PAGE_SIZE);
+  var totalPages = Math.ceil(historyResult.length / HISTORY_PAGE_SIZE);
+  if (pageData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:24px;">暂无数据</td></tr>';
+  } else {
+    tbody.innerHTML = pageData.map(function(d) {
+      var date = new Date(d.timestamp);
+      var timeStr = isNaN(date.getTime()) ? d.timestamp : date.toLocaleString('zh-CN', { hour12: false });
+      var cls = d.alarm ? 'alarm-row' : '';
+      var alarmText = d.alarmMsg || (d.alarm ? '是' : '否');
+      var fmt = function(v) { return typeof v === 'number' ? v.toFixed(1) : v; };
+      return '<tr class="' + cls + '"><td>' + timeStr + '</td><td>' + fmt(d.temperature) + '</td><td>' + fmt(d.humidity) + '</td><td>' + fmt(d.pressure) + '</td><td>' + alarmText + '</td></tr>';
+    }).join('');
+  }
+  document.getElementById('pagination').innerHTML =
+    '<button class="btn" onclick="goHistoryPage(' + (historyPage - 1) + ')" ' + (historyPage === 0 ? 'disabled' : '') + '>上一页</button>' +
+    '<span class="page-info">第 ' + (historyPage + 1) + ' / ' + Math.max(totalPages, 1) + ' 页 (共 ' + historyResult.length + ' 条)</span>' +
+    '<button class="btn" onclick="goHistoryPage(' + (historyPage + 1) + ')" ' + (historyPage + 1 >= totalPages ? 'disabled' : '') + '>下一页</button>';
+}
+
+function goHistoryPage(p) {
+  var totalPages = Math.ceil(historyResult.length / HISTORY_PAGE_SIZE);
+  if (p < 0 || p >= totalPages) return;
+  historyPage = p; renderHistoryTable();
+}
+
+function exportCSV() {
+  if (historyResult.length === 0) { alert('请先查询历史数据'); return; }
+  var csv = '时间,温度(°C),湿度(%),气压(kPa),报警\n';
+  historyResult.forEach(function(d) {
+    var date = new Date(d.timestamp);
+    var ts = isNaN(date.getTime()) ? d.timestamp : date.toLocaleString('zh-CN', { hour12: false });
+    var alarm = d.alarmMsg || (d.alarm ? '是' : '否');
+    var fmt = function(v) { return typeof v === 'number' ? v.toFixed(1) : v; };
+    csv += ts + ',' + fmt(d.temperature) + ',' + fmt(d.humidity) + ',' + fmt(d.pressure) + ',' + alarm + '\n';
+  });
+  var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url;
+  a.download = 'history_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// Config Panel
+// ============================================================
+function toggleConfig() {
+  document.getElementById('configBody').classList.toggle('open');
+  document.getElementById('configToggle').classList.toggle('open');
+}
+
+function syncConfigFromUI() {
+  config.tempHi   = parseFloat(document.getElementById('cfgTempHi').value)   || 40;
+  config.tempLo   = parseFloat(document.getElementById('cfgTempLo').value)   || 0;
+  config.humiHi   = parseFloat(document.getElementById('cfgHumiHi').value)   || 80;
+  config.humiLo   = parseFloat(document.getElementById('cfgHumiLo').value)   || 20;
+  config.pressHi  = parseFloat(document.getElementById('cfgPressHi').value)  || 110;
+  config.pressLo  = parseFloat(document.getElementById('cfgPressLo').value)  || 90;
+  config.interval = parseInt(document.getElementById('cfgInterval').value)   || 3;
+  config.alarmEnabled = document.getElementById('cfgAlarmEnabled').checked;
+  updateThresholdLines();
+}
+
+document.querySelectorAll('#configBody input').forEach(function(el) {
+  el.addEventListener('change', syncConfigFromUI);
+  el.addEventListener('input', syncConfigFromUI);
+});
+
+// ============================================================
+// Alarm Checker
+// ============================================================
+function checkAlarms(data) {
+  if (!config.alarmEnabled) return { any: false };
+  var a = {
+    tempHigh: data.temperature > config.tempHi, tempLow: data.temperature < config.tempLo,
+    humiHigh: data.humidity > config.humiHi, humiLow: data.humidity < config.humiLo,
+    pressHigh: data.pressure > config.pressHi, pressLow: data.pressure < config.pressLo
+  };
+  a.any = a.tempHigh || a.tempLow || a.humiHigh || a.humiLow || a.pressHigh || a.pressLow;
+  var parts = [];
+  if (a.tempHigh) parts.push('温度高:' + data.temperature.toFixed(1));
+  if (a.tempLow)  parts.push('温度低:' + data.temperature.toFixed(1));
+  if (a.humiHigh) parts.push('湿度高:' + data.humidity.toFixed(1));
+  if (a.humiLow)  parts.push('湿度低:' + data.humidity.toFixed(1));
+  if (a.pressHigh) parts.push('气压高:' + data.pressure.toFixed(1));
+  if (a.pressLow)  parts.push('气压低:' + data.pressure.toFixed(1));
+  a.msg = parts.join(';');
+  return a;
+}
+
+// ============================================================
+// Main Loop (fallback only)
+// ============================================================
+function dataTick() {
+  if (backendAvailable) return;
+  syncConfigFromUI();
+  api.fetchCurrent().then(function(data) {
+    var alarms = checkAlarms(data);
+    var record = {
+      temperature: data.temperature, humidity: data.humidity, pressure: data.pressure,
+      timestamp: data.timestamp, alarm: alarms.any, alarmMsg: alarms.msg || '', isSimulated: true
+    };
+    dataBuffer.push(record);
+    if (dataBuffer.length > 5000) dataBuffer.shift();
+    var dt = new Date(data.timestamp);
+    chartTimestamps.push(dt.toLocaleString('zh-CN', { hour12: false }));
+    chartTemp.push(data.temperature); chartHumi.push(data.humidity); chartPress.push(data.pressure);
+    while (chartTimestamps.length > MAX_CHART_POINTS) {
+      chartTimestamps.shift(); chartTemp.shift(); chartHumi.shift(); chartPress.shift();
+    }
+    updateCards(data, alarms); updateChart(); updateThresholdLines();
+    if (alarms.any && !lastAlarmState) { showAlarmBanner(alarms); }
+    lastAlarmState = alarms.any;
+  }).catch(function(err) { console.error('mock data error:', err); });
+  scheduleNext();
+}
+
+var tickTimer = null;
+function scheduleNext() {
+  if (tickTimer) clearTimeout(tickTimer);
+  if (!backendAvailable) { tickTimer = setTimeout(dataTick, config.interval * 1000); }
+}
+
+// ============================================================
+// Backend Detection & Init
+// ============================================================
+function checkBackend() {
+  api.fetchStatus().then(function(status) {
+    if (status && status.connected !== undefined) {
+      backendAvailable = true;
+      console.log('[detect] backend available, mode=' + status.mode);
+      // Update counters from initial status
+      if (status.sendCount !== undefined) updateCounters(status.sendCount, status.recvCount, status.errorCount);
+      // Sync thresholds
+      api.fetchThresholds().then(function(th) {
+        if (th) {
+          config.tempHi = th.tempHi || 40; config.tempLo = th.tempLo || 0;
+          config.humiHi = th.humiHi || 80; config.humiLo = th.humiLo || 20;
+          config.pressHi = th.pressHi || 110; config.pressLo = th.pressLo || 90;
+          config.alarmEnabled = th.alarmEnabled !== false;
+          document.getElementById('cfgTempHi').value = config.tempHi;
+          document.getElementById('cfgTempLo').value = config.tempLo;
+          document.getElementById('cfgHumiHi').value = config.humiHi;
+          document.getElementById('cfgHumiLo').value = config.humiLo;
+          document.getElementById('cfgPressHi').value = config.pressHi;
+          document.getElementById('cfgPressLo').value = config.pressLo;
+          document.getElementById('cfgAlarmEnabled').checked = config.alarmEnabled;
+          updateThresholdLines();
+        }
+      });
+      sseConnect();
+      // Poll stats every 5s
+      statsInterval = setInterval(pollStats, 5000);
+      pollStats();
+      // Poll status for counter updates
+      setInterval(function() {
+        if (!backendAvailable) return;
+        api.fetchStatus().then(function(s) {
+          if (s && s.sendCount !== undefined) updateCounters(s.sendCount, s.recvCount, s.errorCount);
+        }).catch(function() {});
+      }, 3000);
+      updateStatusBar(status.mode === 'simulation' ? 'simulation' : 'online',
+        status.mode === 'simulation' ? 'backend simulation' : 'backend online');
+    } else { useFallbackMode(); }
+  }).catch(function() { useFallbackMode(); });
+}
+
+function useFallbackMode() {
+  backendAvailable = false;
+  updateStatusBar('offline', 'backend offline \xB7 mock data');
+  dataTick();
+}
+
+function init() {
+  var now = new Date();
+  var oneHourAgo = new Date(now.getTime() - 3600000);
+  document.getElementById('hStart').value = oneHourAgo.toISOString().slice(0, 16);
+  document.getElementById('hEnd').value = now.toISOString().slice(0, 16);
+  initChart();
+  checkBackend();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
