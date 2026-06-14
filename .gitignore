@@ -1,0 +1,25 @@
+# Visual Studio
+bin/
+obj/
+*.user
+*.suo
+*.vs/
+.vs/
+*.sln.docstates
+
+# Build results
+*.exe
+*.dll
+*.pdb
+*.cache
+
+# Data logs (generated at runtime)
+DataLog/
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# Temp files
+*.tmp
+*.log
