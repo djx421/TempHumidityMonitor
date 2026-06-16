@@ -96,31 +96,12 @@ namespace TempHumidityMonitor
             chart1.Series["温度"].Points.AddXY(1, 0);
             chart1.Series["湿度"].Points.AddXY(1, 0);
             chart1.Series["气压"].Points.AddXY(1, 0);
-
-            // 在右侧 GroupBox 右边缘叠加实线 Panel，消除虚线边框
-            AddSolidRightBorder(gbCurrent);
-            AddSolidRightBorder(gbStatsTemp);
-            AddSolidRightBorder(gbStatsHumi);
-            AddSolidRightBorder(gbStatsPress);
-        }
-
-        private void AddSolidRightBorder(GroupBox gb)
-        {
-            var line = new Panel
-            {
-                Width = 1,
-                Height = gb.Height,
-                BackColor = SystemColors.ControlDark,
-                Location = new Point(gb.Width - 1, 0),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
-            };
-            gb.Controls.Add(line);
         }
 
         private void MainForm_Shown(object sender, EventArgs e)
         {
-            splitContainer1.SplitterDistance = 310;
-            splitContainer1.Panel1MinSize = 290;
+            splitContainer1.SplitterDistance = 300;
+            splitContainer1.Panel1MinSize = 260;
             splitContainer1.Panel2MinSize = 200;
         }
 
