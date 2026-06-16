@@ -995,7 +995,7 @@ namespace TempHumidityMonitor
             this.gbCurrent.Controls.Add(this.lblHumiValue);
             this.gbCurrent.Controls.Add(this.lblPressureValue);
             this.gbCurrent.Controls.Add(this.lblUpdateTime);
-            this.gbCurrent.Location = new System.Drawing.Point(676, 138);
+            this.gbCurrent.Location = new System.Drawing.Point(676, 123);
             this.gbCurrent.Name = "gbCurrent";
             this.gbCurrent.Size = new System.Drawing.Size(220, 200);
             this.gbCurrent.TabIndex = 3;
@@ -1088,7 +1088,7 @@ namespace TempHumidityMonitor
             this.gbStatsTemp.Controls.Add(this.lblTempMax);
             this.gbStatsTemp.Controls.Add(this.lblAvgT);
             this.gbStatsTemp.Controls.Add(this.lblTempAvg);
-            this.gbStatsTemp.Location = new System.Drawing.Point(676, 358);
+            this.gbStatsTemp.Location = new System.Drawing.Point(676, 353);
             this.gbStatsTemp.Name = "gbStatsTemp";
             this.gbStatsTemp.Size = new System.Drawing.Size(220, 140);
             this.gbStatsTemp.TabIndex = 4;
@@ -1163,7 +1163,7 @@ namespace TempHumidityMonitor
             this.gbStatsHumi.Controls.Add(this.lblHumiMax);
             this.gbStatsHumi.Controls.Add(this.lblAvgH);
             this.gbStatsHumi.Controls.Add(this.lblHumiAvg);
-            this.gbStatsHumi.Location = new System.Drawing.Point(676, 518);
+            this.gbStatsHumi.Location = new System.Drawing.Point(676, 523);
             this.gbStatsHumi.Name = "gbStatsHumi";
             this.gbStatsHumi.Size = new System.Drawing.Size(220, 140);
             this.gbStatsHumi.TabIndex = 5;
@@ -1238,7 +1238,7 @@ namespace TempHumidityMonitor
             this.gbStatsPress.Controls.Add(this.lblPressureMax);
             this.gbStatsPress.Controls.Add(this.lblAvgP);
             this.gbStatsPress.Controls.Add(this.lblPressureAvg);
-            this.gbStatsPress.Location = new System.Drawing.Point(676, 678);
+            this.gbStatsPress.Location = new System.Drawing.Point(676, 693);
             this.gbStatsPress.Name = "gbStatsPress";
             this.gbStatsPress.Size = new System.Drawing.Size(220, 140);
             this.gbStatsPress.TabIndex = 6;
