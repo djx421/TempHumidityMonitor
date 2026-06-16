@@ -53,6 +53,7 @@ namespace TempHumidityMonitor
         private System.IO.Ports.SerialPort serialPort1;
         private NotifyIcon notifyIcon1;
         private ContextMenuStrip cmsTray;
+        private ToolStripMenuItem trayShow, trayExit, trayTempDetail, trayHumiDetail, trayPressureDetail;
 
         // ==================== Dispose ====================
         protected override void Dispose(bool disposing)
@@ -1444,9 +1445,34 @@ namespace TempHumidityMonitor
             this.notifyIcon1.Visible = true;
             this.notifyIcon1.DoubleClick += new System.EventHandler(this.notifyIcon1_DoubleClick);
             // 
+            // cmsTray items
+            // 
+            this.trayShow = new System.Windows.Forms.ToolStripMenuItem();
+            this.trayExit = new System.Windows.Forms.ToolStripMenuItem();
+            this.trayTempDetail = new System.Windows.Forms.ToolStripMenuItem();
+            this.trayHumiDetail = new System.Windows.Forms.ToolStripMenuItem();
+            this.trayPressureDetail = new System.Windows.Forms.ToolStripMenuItem();
+            this.trayShow.Text = "显示主窗口";
+            this.trayShow.Click += new System.EventHandler(this.trayShow_Click);
+            this.trayExit.Text = "退出";
+            this.trayExit.Click += new System.EventHandler(this.trayExit_Click);
+            this.trayTempDetail.Text = "温度详情";
+            this.trayTempDetail.Click += new System.EventHandler(this.trayTempDetail_Click);
+            this.trayHumiDetail.Text = "湿度详情";
+            this.trayHumiDetail.Click += new System.EventHandler(this.trayHumiDetail_Click);
+            this.trayPressureDetail.Text = "气压详情";
+            this.trayPressureDetail.Click += new System.EventHandler(this.trayPressureDetail_Click);
+            // 
             // cmsTray
             // 
             this.cmsTray.ImageScalingSize = new System.Drawing.Size(20, 20);
+            this.cmsTray.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+                this.trayShow,
+                this.trayTempDetail,
+                this.trayHumiDetail,
+                this.trayPressureDetail,
+                new System.Windows.Forms.ToolStripSeparator(),
+                this.trayExit});
             this.cmsTray.Name = "cmsTray";
             this.cmsTray.Size = new System.Drawing.Size(125, 126);
             // 
@@ -1459,6 +1485,52 @@ namespace TempHumidityMonitor
             this.Name = "MainForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "温湿度传感器监控程序";
+            // 
+            // Event bindings — Form
+            // 
+            this.Load += new System.EventHandler(this.MainForm_Load);
+            this.Shown += new System.EventHandler(this.MainForm_Shown);
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
+            // 
+            // Event bindings — Buttons
+            // 
+            this.btnRefreshPorts.Click += new System.EventHandler(this.btnRefreshPorts_Click);
+            this.btnOpenCloseCom.Click += new System.EventHandler(this.btnOpenCloseCom_Click);
+            this.btnManualSend.Click += new System.EventHandler(this.btnManualSend_Click);
+            this.btnExportCSV.Click += new System.EventHandler(this.btnExportCSV_Click);
+            this.btnClearChart.Click += new System.EventHandler(this.btnClearChart_Click);
+            this.btnCleanDB.Click += new System.EventHandler(this.btnCleanDB_Click);
+            this.btnTabCurrent.Click += new System.EventHandler(this.btnTabCurrent_Click);
+            this.btnTabHistory.Click += new System.EventHandler(this.btnTabHistory_Click);
+            this.btnToggleRead.Click += new System.EventHandler(this.btnToggleRead_Click);
+            this.btnQueryHistory.Click += new System.EventHandler(this.btnQueryHistory_Click);
+            this.btnExportHistory.Click += new System.EventHandler(this.btnExportHistory_Click);
+            // 
+            // Event bindings — CheckBoxes
+            // 
+            this.chkSimMode.CheckedChanged += new System.EventHandler(this.chkSimMode_CheckedChanged);
+            this.chkEnableAlarm.CheckedChanged += new System.EventHandler(this.chkEnableAlarm_CheckedChanged);
+            this.chkEnableAlarm.CheckedChanged += new System.EventHandler(this.SyncAlarmThresholds);
+            this.chkDataLog.CheckedChanged += new System.EventHandler(this.chkDataLog_CheckedChanged);
+            // 
+            // Event bindings — ComboBox
+            // 
+            this.cbReadMode.SelectedIndexChanged += new System.EventHandler(this.cbReadMode_SelectedIndexChanged);
+            // 
+            // Event bindings — NumericUpDown
+            // 
+            this.nudInterval.ValueChanged += new System.EventHandler(this.nudInterval_ValueChanged);
+            this.nudMaxPoints.ValueChanged += new System.EventHandler(this.nudMaxPoints_ValueChanged);
+            this.nudTempHigh.ValueChanged += new System.EventHandler(this.SyncAlarmThresholds);
+            this.nudTempLow.ValueChanged += new System.EventHandler(this.SyncAlarmThresholds);
+            this.nudHumiHigh.ValueChanged += new System.EventHandler(this.SyncAlarmThresholds);
+            this.nudHumiLow.ValueChanged += new System.EventHandler(this.SyncAlarmThresholds);
+            this.nudPressureHigh.ValueChanged += new System.EventHandler(this.SyncAlarmThresholds);
+            this.nudPressureLow.ValueChanged += new System.EventHandler(this.SyncAlarmThresholds);
+            // 
+            // Event bindings — Timer
+            // 
+            this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
             this.splitContainer1.Panel1.ResumeLayout(false);
             this.splitContainer1.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
