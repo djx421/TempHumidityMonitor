@@ -940,7 +940,7 @@ namespace TempHumidityMonitor
             legend1.IsTextAutoFit = false;
             legend1.Name = "Legend";
             this.chart1.Legends.Add(legend1);
-            this.chart1.Location = new System.Drawing.Point(0, 80);
+            this.chart1.Location = new System.Drawing.Point(21, 80);
             this.chart1.Name = "chart1";
             series1.BorderWidth = 2;
             series1.BorderDashStyle = System.Windows.Forms.DataVisualization.Charting.ChartDashStyle.Solid;
@@ -995,7 +995,7 @@ namespace TempHumidityMonitor
             this.gbCurrent.Controls.Add(this.lblHumiValue);
             this.gbCurrent.Controls.Add(this.lblPressureValue);
             this.gbCurrent.Controls.Add(this.lblUpdateTime);
-            this.gbCurrent.Location = new System.Drawing.Point(655, 86);
+            this.gbCurrent.Location = new System.Drawing.Point(676, 150);
             this.gbCurrent.Name = "gbCurrent";
             this.gbCurrent.Size = new System.Drawing.Size(220, 200);
             this.gbCurrent.TabIndex = 3;
@@ -1088,7 +1088,7 @@ namespace TempHumidityMonitor
             this.gbStatsTemp.Controls.Add(this.lblTempMax);
             this.gbStatsTemp.Controls.Add(this.lblAvgT);
             this.gbStatsTemp.Controls.Add(this.lblTempAvg);
-            this.gbStatsTemp.Location = new System.Drawing.Point(655, 296);
+            this.gbStatsTemp.Location = new System.Drawing.Point(676, 360);
             this.gbStatsTemp.Name = "gbStatsTemp";
             this.gbStatsTemp.Size = new System.Drawing.Size(220, 140);
             this.gbStatsTemp.TabIndex = 4;
@@ -1163,7 +1163,7 @@ namespace TempHumidityMonitor
             this.gbStatsHumi.Controls.Add(this.lblHumiMax);
             this.gbStatsHumi.Controls.Add(this.lblAvgH);
             this.gbStatsHumi.Controls.Add(this.lblHumiAvg);
-            this.gbStatsHumi.Location = new System.Drawing.Point(655, 450);
+            this.gbStatsHumi.Location = new System.Drawing.Point(676, 514);
             this.gbStatsHumi.Name = "gbStatsHumi";
             this.gbStatsHumi.Size = new System.Drawing.Size(220, 140);
             this.gbStatsHumi.TabIndex = 5;
@@ -1238,7 +1238,7 @@ namespace TempHumidityMonitor
             this.gbStatsPress.Controls.Add(this.lblPressureMax);
             this.gbStatsPress.Controls.Add(this.lblAvgP);
             this.gbStatsPress.Controls.Add(this.lblPressureAvg);
-            this.gbStatsPress.Location = new System.Drawing.Point(655, 604);
+            this.gbStatsPress.Location = new System.Drawing.Point(676, 668);
             this.gbStatsPress.Name = "gbStatsPress";
             this.gbStatsPress.Size = new System.Drawing.Size(220, 140);
             this.gbStatsPress.TabIndex = 6;
