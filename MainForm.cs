@@ -100,8 +100,8 @@ namespace TempHumidityMonitor
 
         private void MainForm_Shown(object sender, EventArgs e)
         {
-            splitContainer1.SplitterDistance = 300;
-            splitContainer1.Panel1MinSize = 260;
+            splitContainer1.SplitterDistance = 340;
+            splitContainer1.Panel1MinSize = 300;
             splitContainer1.Panel2MinSize = 200;
         }
 
@@ -194,7 +194,7 @@ namespace TempHumidityMonitor
                     webRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\web"));
                 apiService = new ApiService(apiPort, webRoot, dbService);
                 apiService.Start();
-                lblStatus.Text = "API: http://localhost:" + apiPort + "/ | " + lblStatus.Text;
+                lblStatus.Text = "API:" + apiPort + " | " + lblStatus.Text;
             }
             catch (Exception ex)
             {
@@ -209,7 +209,7 @@ namespace TempHumidityMonitor
                 if (!string.IsNullOrEmpty(cloudUrl))
                 {
                     CloudPushService.Start(cloudUrl);
-                    lblStatus.Text = lblStatus.Text + " | 云端: " + cloudUrl;
+                    lblStatus.Text = lblStatus.Text + " | 云:" + cloudUrl.Replace("http://", "").Replace(":8080","");
                 }
             }
             catch (Exception ex)
