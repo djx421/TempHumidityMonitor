@@ -928,7 +928,13 @@ namespace TempHumidityMonitor
             chartArea1.CursorX.IsUserEnabled = true;
             chartArea1.CursorX.IsUserSelectionEnabled = true;
             chartArea1.Name = "MainArea";
+            chartArea1.BorderDashStyle = System.Windows.Forms.DataVisualization.Charting.ChartDashStyle.Solid;
+            chartArea1.BorderColor = System.Drawing.Color.FromArgb(180, 180, 180);
+            chartArea1.BorderWidth = 1;
             this.chart1.ChartAreas.Add(chartArea1);
+            this.chart1.BorderlineDashStyle = System.Windows.Forms.DataVisualization.Charting.ChartDashStyle.Solid;
+            this.chart1.BorderlineColor = System.Drawing.Color.FromArgb(180, 180, 180);
+            this.chart1.BorderlineWidth = 1;
             legend1.Docking = System.Windows.Forms.DataVisualization.Charting.Docking.Top;
             legend1.Font = new System.Drawing.Font("微软雅黑", 9F);
             legend1.IsTextAutoFit = false;
@@ -937,6 +943,7 @@ namespace TempHumidityMonitor
             this.chart1.Location = new System.Drawing.Point(12, 80);
             this.chart1.Name = "chart1";
             series1.BorderWidth = 2;
+            series1.BorderDashStyle = System.Windows.Forms.DataVisualization.Charting.ChartDashStyle.Solid;
             series1.ChartArea = "MainArea";
             series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
             series1.Color = System.Drawing.Color.Red;
@@ -948,6 +955,7 @@ namespace TempHumidityMonitor
             series1.Name = "温度";
             series1.ToolTip = "温度: #VAL{F1} ℃";
             series2.BorderWidth = 2;
+            series2.BorderDashStyle = System.Windows.Forms.DataVisualization.Charting.ChartDashStyle.Solid;
             series2.ChartArea = "MainArea";
             series2.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
             series2.Color = System.Drawing.Color.Blue;
@@ -959,6 +967,7 @@ namespace TempHumidityMonitor
             series2.Name = "湿度";
             series2.ToolTip = "湿度: #VAL{F1} %";
             series3.BorderWidth = 2;
+            series3.BorderDashStyle = System.Windows.Forms.DataVisualization.Charting.ChartDashStyle.Solid;
             series3.ChartArea = "MainArea";
             series3.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
             series3.Color = System.Drawing.Color.Green;
