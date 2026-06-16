@@ -52,5 +52,30 @@ namespace TempHumidityMonitor.Services
             }
             catch { }
         }
+
+        // ==================== 静态便捷方法（供无需实例的服务调用） ====================
+        public static void Info(string msg)
+        {
+            try
+            {
+                string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "DataLog");
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                File.AppendAllText(Path.Combine(dir, string.Format("app_{0:yyyyMMdd}.log", DateTime.Now)),
+                    string.Format("[{0:HH:mm:ss}] INFO  {1}\n", DateTime.Now, msg), Encoding.UTF8);
+            }
+            catch { }
+        }
+
+        public static void Warn(string msg)
+        {
+            try
+            {
+                string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "DataLog");
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                File.AppendAllText(Path.Combine(dir, string.Format("app_{0:yyyyMMdd}.log", DateTime.Now)),
+                    string.Format("[{0:HH:mm:ss}] WARN  {1}\n", DateTime.Now, msg), Encoding.UTF8);
+            }
+            catch { }
+        }
     }
 }

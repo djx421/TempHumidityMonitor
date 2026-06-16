@@ -19,7 +19,7 @@ namespace TempHumidityMonitor
         private ChartArea chartArea;
         private NumericUpDown nudYMin, nudYMax;
         private Button btnApplyRange, btnAutoRange;
-        private Label lblRange, lblYMinLabel, lblYMaxLabel;
+        private Label lblYMinLabel, lblYMaxLabel;
         private Button btnClear;
         private Label lblLatest;
 
