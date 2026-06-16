@@ -934,7 +934,7 @@ namespace TempHumidityMonitor
             legend1.IsTextAutoFit = false;
             legend1.Name = "Legend";
             this.chart1.Legends.Add(legend1);
-            this.chart1.Location = new System.Drawing.Point(0, 80);
+            this.chart1.Location = new System.Drawing.Point(12, 80);
             this.chart1.Name = "chart1";
             series1.BorderWidth = 2;
             series1.ChartArea = "MainArea";
@@ -973,7 +973,7 @@ namespace TempHumidityMonitor
             this.chart1.Series.Add(series1);
             this.chart1.Series.Add(series2);
             this.chart1.Series.Add(series3);
-            this.chart1.Size = new System.Drawing.Size(650, 797);
+            this.chart1.Size = new System.Drawing.Size(660, 797);
             this.chart1.TabIndex = 0;
             // 
             // gbCurrent
@@ -986,7 +986,7 @@ namespace TempHumidityMonitor
             this.gbCurrent.Controls.Add(this.lblHumiValue);
             this.gbCurrent.Controls.Add(this.lblPressureValue);
             this.gbCurrent.Controls.Add(this.lblUpdateTime);
-            this.gbCurrent.Location = new System.Drawing.Point(655, 86);
+            this.gbCurrent.Location = new System.Drawing.Point(678, 86);
             this.gbCurrent.Name = "gbCurrent";
             this.gbCurrent.Size = new System.Drawing.Size(220, 200);
             this.gbCurrent.TabIndex = 3;
@@ -1079,7 +1079,7 @@ namespace TempHumidityMonitor
             this.gbStatsTemp.Controls.Add(this.lblTempMax);
             this.gbStatsTemp.Controls.Add(this.lblAvgT);
             this.gbStatsTemp.Controls.Add(this.lblTempAvg);
-            this.gbStatsTemp.Location = new System.Drawing.Point(655, 296);
+            this.gbStatsTemp.Location = new System.Drawing.Point(678, 296);
             this.gbStatsTemp.Name = "gbStatsTemp";
             this.gbStatsTemp.Size = new System.Drawing.Size(220, 140);
             this.gbStatsTemp.TabIndex = 4;
@@ -1154,7 +1154,7 @@ namespace TempHumidityMonitor
             this.gbStatsHumi.Controls.Add(this.lblHumiMax);
             this.gbStatsHumi.Controls.Add(this.lblAvgH);
             this.gbStatsHumi.Controls.Add(this.lblHumiAvg);
-            this.gbStatsHumi.Location = new System.Drawing.Point(655, 450);
+            this.gbStatsHumi.Location = new System.Drawing.Point(678, 450);
             this.gbStatsHumi.Name = "gbStatsHumi";
             this.gbStatsHumi.Size = new System.Drawing.Size(220, 140);
             this.gbStatsHumi.TabIndex = 5;
@@ -1229,7 +1229,7 @@ namespace TempHumidityMonitor
             this.gbStatsPress.Controls.Add(this.lblPressureMax);
             this.gbStatsPress.Controls.Add(this.lblAvgP);
             this.gbStatsPress.Controls.Add(this.lblPressureAvg);
-            this.gbStatsPress.Location = new System.Drawing.Point(655, 604);
+            this.gbStatsPress.Location = new System.Drawing.Point(678, 604);
             this.gbStatsPress.Name = "gbStatsPress";
             this.gbStatsPress.Size = new System.Drawing.Size(220, 140);
             this.gbStatsPress.TabIndex = 6;
@@ -1308,7 +1308,7 @@ namespace TempHumidityMonitor
             this.gbHistory.Controls.Add(this.dgvHistory);
             this.gbHistory.Location = new System.Drawing.Point(4, 80);
             this.gbHistory.Name = "gbHistory";
-            this.gbHistory.Size = new System.Drawing.Size(870, 790);
+            this.gbHistory.Size = new System.Drawing.Size(890, 790);
             this.gbHistory.TabIndex = 13;
             this.gbHistory.TabStop = false;
             this.gbHistory.Text = "历史数据查询";
