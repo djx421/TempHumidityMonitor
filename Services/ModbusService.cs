@@ -60,7 +60,8 @@ namespace TempHumidityMonitor.Services
 
         public static byte[] GetCommand(int modeIndex)
         {
-            if (Commands.TryGetValue(modeIndex, out var cmd)) return cmd;
+            byte[] cmd;
+            if (Commands.TryGetValue(modeIndex, out cmd)) return cmd;
             return Commands[0];
         }
 

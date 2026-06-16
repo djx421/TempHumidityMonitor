@@ -201,6 +201,21 @@ namespace TempHumidityMonitor
                 lblStatus.Text = "API启动失败(端口" + apiPort + "): " + ex.Message;
                 lblStatus.ForeColor = Color.Red;
             }
+
+            // 启动云端推送服务
+            try
+            {
+                string cloudUrl = ReadCloudUrl(configPath);
+                if (!string.IsNullOrEmpty(cloudUrl))
+                {
+                    CloudPushService.Start(cloudUrl);
+                    lblStatus.Text = lblStatus.Text + " | 云端: " + cloudUrl;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.Warn("[CloudPush] 启动失败: " + ex.Message);
+            }
         }
 
         // ==================== 详情子窗体 ====================
@@ -735,6 +750,21 @@ namespace TempHumidityMonitor
                     File.Copy(templatePath, dbPath);
             }
             return dbPath;
+        }
+
+        /// <summary>从 modbus_config.json 读取 cloud_url 配置</summary>
+        private string ReadCloudUrl(string configPath)
+        {
+            if (!File.Exists(configPath)) return null;
+            string json = File.ReadAllText(configPath, Encoding.UTF8);
+            // 简单手动解析: "cloud_url": "http://..."
+            int idx = json.IndexOf("\"cloud_url\"");
+            if (idx < 0) return null;
+            idx = json.IndexOf('"', idx + 12);
+            if (idx < 0) return null;
+            int end = json.IndexOf('"', idx + 1);
+            if (end < 0) return null;
+            return json.Substring(idx + 1, end - idx - 1);
         }
 
         private void SaveToDatabase(float t, float h, float p)

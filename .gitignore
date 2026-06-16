@@ -23,3 +23,8 @@ Desktop.ini
 # Temp files
 *.tmp
 *.log
+
+# Reasonix
+.reasonix/
+.codegraph/
+reasonix.toml

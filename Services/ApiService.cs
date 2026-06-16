@@ -601,6 +601,34 @@ namespace TempHumidityMonitor.Services
             }
         }
 
+        // ==================== 云端推送数据快照 ====================
+        /// <summary>
+        /// 供 CloudPushService 调用的线程安全数据快照
+        /// </summary>
+        public struct Snapshot
+        {
+            public float Temp, Humi, Pressure;
+            public DateTime Timestamp;
+            public bool IsSim, IsReading, IsReconnecting;
+            public string StatusText;
+            public int SendCount, RecvCount, ErrorCount;
+        }
+
+        public static Snapshot GetSnapshot()
+        {
+            lock (_lock)
+            {
+                return new Snapshot
+                {
+                    Temp = LatestTemp, Humi = LatestHumi, Pressure = LatestPressure,
+                    Timestamp = LatestTimestamp,
+                    IsSim = IsSimMode, IsReading = IsReading, IsReconnecting = IsReconnecting,
+                    StatusText = StatusText ?? "",
+                    SendCount = SendCount, RecvCount = RecvCount, ErrorCount = ErrorCount
+                };
+            }
+        }
+
         // ==================== 响应工具 ====================
         private void RespondJson(HttpListenerContext ctx, string json)
         {
