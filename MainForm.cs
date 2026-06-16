@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -49,6 +49,11 @@ namespace TempHumidityMonitor
         private ApiService apiService;
         private int apiPort = 8090;
 
+        // ==================== 子窗体 ====================
+        private SensorDetailForm tempDetailForm;
+        private SensorDetailForm humiDetailForm;
+        private SensorDetailForm pressureDetailForm;
+
         // ==================== 构造函数 ====================
         public MainForm()
         {
@@ -80,6 +85,7 @@ namespace TempHumidityMonitor
         private void InitRuntime()
         {
             initControls();
+            InitDetailForms();
             LoadSettings();
         }
 
@@ -197,6 +203,48 @@ namespace TempHumidityMonitor
             }
         }
 
+        // ==================== 详情子窗体 ====================
+        private void InitDetailForms()
+        {
+            tempDetailForm = new SensorDetailForm("温度", "℃", Color.Red, maxChartPoint);
+            humiDetailForm = new SensorDetailForm("湿度", "%", Color.Blue, maxChartPoint);
+            pressureDetailForm = new SensorDetailForm("气压", "kPa", Color.Green, maxChartPoint);
+
+            btnTempDetail.Click += (s, e) => { tempDetailForm.Show(); tempDetailForm.BringToFront(); };
+            btnHumiDetail.Click += (s, e) => { humiDetailForm.Show(); humiDetailForm.BringToFront(); };
+            btnPressureDetail.Click += (s, e) => { pressureDetailForm.Show(); pressureDetailForm.BringToFront(); };
+
+            // 曲线显示/隐藏切换
+            chkShowTemp.CheckedChanged += (s2, e2) =>
+            {
+                chart1.Series["温度"].Enabled = chkShowTemp.Checked;
+                var c = chkShowTemp.Checked ? Color.FromArgb(255, 230, 230) : SystemColors.Control;
+                chkShowTemp.BackColor = c;
+            };
+            chkShowHumi.CheckedChanged += (s2, e2) =>
+            {
+                chart1.Series["湿度"].Enabled = chkShowHumi.Checked;
+                var c = chkShowHumi.Checked ? Color.FromArgb(220, 230, 255) : SystemColors.Control;
+                chkShowHumi.BackColor = c;
+            };
+            chkShowPressure.CheckedChanged += (s2, e2) =>
+            {
+                chart1.Series["气压"].Enabled = chkShowPressure.Checked;
+                var c = chkShowPressure.Checked ? Color.FromArgb(220, 255, 220) : SystemColors.Control;
+                chkShowPressure.BackColor = c;
+            };
+
+            nudMaxPoints.ValueChanged += (s2, e2) =>
+            {
+                tempDetailForm.MaxChartPoints = maxChartPoint;
+                humiDetailForm.MaxChartPoints = maxChartPoint;
+                pressureDetailForm.MaxChartPoints = maxChartPoint;
+            };
+        }
+
+        public void ShowTempDetail() { tempDetailForm?.Show(); tempDetailForm?.BringToFront(); }
+        public void ShowHumiDetail() { humiDetailForm?.Show(); humiDetailForm?.BringToFront(); }
+        public void ShowPressureDetail() { pressureDetailForm?.Show(); pressureDetailForm?.BringToFront(); }
         // ==================== 串口操作 ====================
         private void RefreshComPorts()
         {
@@ -318,7 +366,6 @@ namespace TempHumidityMonitor
             }
         }
 
-
         private void SimulateData()
         {
             simTemp += (float)(simRandom.NextDouble() * 3.0 - 1.5);
@@ -336,6 +383,7 @@ namespace TempHumidityMonitor
             if (dataLogEnabled) LogDataToFile(simTemp, simHumi, simPressure);
             SaveToDatabase(simTemp, simHumi, simPressure);
             ApiService.BroadcastSensorData(simTemp, simHumi, simPressure, true);
+            PushToDetailForms(simTemp, simHumi, simPressure);
             this.BeginInvoke(new Action(() => updateUI(simTemp, simHumi, simPressure)));
         }
 
@@ -404,8 +452,6 @@ namespace TempHumidityMonitor
             this.BeginInvoke(new Action(() =>
             {
                 tsslError.Text = "错误: " + nError;
-                // 不立即触发重连，由 timer1_Tick 的 15 秒超时统一处理，
-                // 避免错误端口频繁产生串口错误导致"打开→重连→打开"死循环
             }));
         }
         private string _reconnectReason = "";
@@ -442,7 +488,7 @@ namespace TempHumidityMonitor
             cbComPort.Enabled = false;
             btnRefreshPorts.Enabled = false;
             cbBaudRate.Enabled = false;
-            tsslStatus.Text = "\u25CF " + reason + "，重连中";
+            tsslStatus.Text = "● " + reason + "，重连中";
             tsslStatus.ForeColor = Color.OrangeRed;
             ApiService.UpdateStatus(false, false, false, true, reason + "，重连中...");
 
@@ -498,7 +544,7 @@ namespace TempHumidityMonitor
             btnOpenCloseCom.BackColor = Color.LightCoral;
             lblStatus.Text = "数据已恢复，正在采集...";
             lblStatus.ForeColor = Color.Green;
-            tsslStatus.Text = "\u25CF 串口已打开 - " + lastPortName;
+            tsslStatus.Text = "● 串口已打开 - " + lastPortName;
             tsslStatus.ForeColor = Color.Green;
             ApiService.UpdateStatus(true, false, true, false, "数据已恢复");
         }
@@ -522,7 +568,7 @@ namespace TempHumidityMonitor
             btnToggleRead.Enabled = false;
             btnToggleRead.Text = "▶ 开始采集";
             btnToggleRead.BackColor = SystemColors.Control;
-            tsslStatus.Text = "\u25CF 串口未打开";
+            tsslStatus.Text = "● 串口未打开";
             tsslStatus.ForeColor = Color.Gray;
             lblStatus.Text = "自动重连失败(已重试3次)，请检查设备或更换端口后手动打开";
             lblStatus.ForeColor = Color.Red;
@@ -548,14 +594,12 @@ namespace TempHumidityMonitor
                     this.BeginInvoke(new Action(() => { tsslError.Text = "错误: " + nError; }));
                     return;
                 }
-                // 只有通过 CheckFrame 校验后才更新接收时间，避免垃圾数据重置超时
                 lastReceiveTime = DateTime.Now;
                 var data = ModbusService.ParseSensorData(buffer, readModeIndex, lastTemp, lastHumi, lastPressure);
                 float t = data.Temperature, h = data.Humidity, p = data.Pressure;
                 lastTemp = t; lastHumi = h; lastPressure = p;
                 if (t < -40 || t > 125 || h < 0 || h > 100 || p < 50 || p > 200)
                 { LogError(string.Format("数据超范围: T={0:F1} H={1:F1} P={2:F1}", t, h, p)); return; }
-                // 收到有效且合法的数据 → 如果在重连验证期则确认成功
                 if (isReconnecting)
                     this.BeginInvoke(new Action(() => ConfirmSuccess()));
                 AddDataPoint(t, h, p);
@@ -594,7 +638,6 @@ namespace TempHumidityMonitor
             if (h < humiMin) humiMin = h; if (h > humiMax) humiMax = h;
             if (p < pressureMin) pressureMin = p; if (p > pressureMax) pressureMax = p;
             tempSum += t; humiSum += h; pressureSum += p; dataCount++;
-            // 同步统计数据到 API
             ApiService.UpdateStats(dataCount, tempMin, tempMax, tempSum,
                 humiMin, humiMax, humiSum, pressureMin, pressureMax, pressureSum);
         }
@@ -606,6 +649,7 @@ namespace TempHumidityMonitor
             lblPressureValue.Text = string.Format("{0:F1} kPa", p);
             lblUpdateTime.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             UpdateChart();
+            PushToDetailForms(t, h, p);
             if (dataCount > 0)
             {
                 lblTempMin.Text = string.Format("{0:F1} ℃", tempMin);
@@ -684,7 +728,6 @@ namespace TempHumidityMonitor
         private string GetDbPath()
         {
             string dbPath = Path.Combine(Application.StartupPath, "TempHumidityData.db");
-            // 首次运行或clean build后从项目根目录复制模板数据库
             if (!File.Exists(dbPath))
             {
                 string templatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..\\..\\TempHumidityData.db");
@@ -732,11 +775,6 @@ namespace TempHumidityMonitor
             if (MessageBox.Show("确定要清除全部数据（图表+统计+队列）？", "确认", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) == DialogResult.OK)
                 ClearAllData();
         }
-        private void btnClearStats_Click(object sender, EventArgs e)
-        {
-            if (MessageBox.Show("确定要重置统计数据（最小/最大/平均）？", "确认", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) == DialogResult.OK)
-                ClearStats();
-        }
 
         private void ClearAllData()
         {
@@ -762,6 +800,13 @@ namespace TempHumidityMonitor
             lblTempMin.Text = "--.- ℃"; lblTempMax.Text = "--.- ℃"; lblTempAvg.Text = "--.- ℃";
             lblHumiMin.Text = "--.- %"; lblHumiMax.Text = "--.- %"; lblHumiAvg.Text = "--.- %";
             lblPressureMin.Text = "--.- kPa"; lblPressureMax.Text = "--.- kPa"; lblPressureAvg.Text = "--.- kPa";
+        }
+
+        private void PushToDetailForms(float t, float h, float p)
+        {
+            tempDetailForm?.PushData(t);
+            humiDetailForm?.PushData(h);
+            pressureDetailForm?.PushData(p);
         }
 
         // ==================== 设置变更 ====================
@@ -856,6 +901,10 @@ namespace TempHumidityMonitor
             try { apiService?.Shutdown(); } catch { }
             Application.Exit();
         }
+
+        private void trayTempDetail_Click(object sender, EventArgs e) { ShowTempDetail(); }
+        private void trayHumiDetail_Click(object sender, EventArgs e) { ShowHumiDetail(); }
+        private void trayPressureDetail_Click(object sender, EventArgs e) { ShowPressureDetail(); }
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {

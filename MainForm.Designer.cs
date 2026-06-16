@@ -16,10 +16,12 @@ namespace TempHumidityMonitor
 
         // ==================== 左侧控件 ====================
         private CheckBox chkSimMode;
+        private CheckBox chkShowTemp, chkShowHumi, chkShowPressure;
         private GroupBox gbSerial, gbWeb, gbCollect, gbAlarm, gbData;
         private ComboBox cbComPort, cbBaudRate, cbReadMode;
         private Button btnRefreshPorts, btnOpenCloseCom, btnManualSend;
         private Button btnExportCSV, btnClearChart, btnCleanDB;
+        private Button btnTempDetail, btnHumiDetail, btnPressureDetail;
         private NumericUpDown nudRetainDays;
         private Label lblRetainDays;
         private CheckBox chkEnableAlarm, chkDataLog;
@@ -72,6 +74,9 @@ namespace TempHumidityMonitor
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.chkSimMode = new System.Windows.Forms.CheckBox();
+            this.chkShowTemp = new System.Windows.Forms.CheckBox();
+            this.chkShowHumi = new System.Windows.Forms.CheckBox();
+            this.chkShowPressure = new System.Windows.Forms.CheckBox();
             this.gbSerial = new System.Windows.Forms.GroupBox();
             this.lblPortLabel = new System.Windows.Forms.Label();
             this.lblBaudLabel = new System.Windows.Forms.Label();
@@ -112,6 +117,9 @@ namespace TempHumidityMonitor
             this.lblRetainDays = new System.Windows.Forms.Label();
             this.nudRetainDays = new System.Windows.Forms.NumericUpDown();
             this.btnCleanDB = new System.Windows.Forms.Button();
+            this.btnTempDetail = new System.Windows.Forms.Button();
+            this.btnHumiDetail = new System.Windows.Forms.Button();
+            this.btnPressureDetail = new System.Windows.Forms.Button();
             this.lblStatus = new System.Windows.Forms.Label();
             this.btnTabCurrent = new System.Windows.Forms.Button();
             this.btnTabHistory = new System.Windows.Forms.Button();
@@ -203,6 +211,12 @@ namespace TempHumidityMonitor
             // 
             // splitContainer1.Panel1
             // 
+            this.splitContainer1.Panel1.Controls.Add(this.btnTempDetail);
+            this.splitContainer1.Panel1.Controls.Add(this.btnHumiDetail);
+            this.splitContainer1.Panel1.Controls.Add(this.btnPressureDetail);
+            this.splitContainer1.Panel1.Controls.Add(this.chkShowTemp);
+            this.splitContainer1.Panel1.Controls.Add(this.chkShowHumi);
+            this.splitContainer1.Panel1.Controls.Add(this.chkShowPressure);
             this.splitContainer1.Panel1.Controls.Add(this.chkSimMode);
             this.splitContainer1.Panel1.Controls.Add(this.gbSerial);
             this.splitContainer1.Panel1.Controls.Add(this.gbWeb);
@@ -233,6 +247,48 @@ namespace TempHumidityMonitor
             this.chkSimMode.Size = new System.Drawing.Size(280, 22);
             this.chkSimMode.TabIndex = 0;
             this.chkSimMode.Text = "模拟模式（无需硬件即可演示）";
+            //
+            // chkShowTemp
+            //
+            this.chkShowTemp.Appearance = System.Windows.Forms.Appearance.Button;
+            this.chkShowTemp.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(230)))), ((int)(((byte)(230)))));
+            this.chkShowTemp.Checked = true;
+            this.chkShowTemp.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkShowTemp.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.chkShowTemp.Location = new System.Drawing.Point(12, 28);
+            this.chkShowTemp.Name = "chkShowTemp";
+            this.chkShowTemp.Size = new System.Drawing.Size(88, 24);
+            this.chkShowTemp.TabIndex = 1;
+            this.chkShowTemp.Text = "🌡 温度";
+            this.chkShowTemp.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            //
+            // chkShowHumi
+            //
+            this.chkShowHumi.Appearance = System.Windows.Forms.Appearance.Button;
+            this.chkShowHumi.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(230)))), ((int)(((byte)(255)))));
+            this.chkShowHumi.Checked = true;
+            this.chkShowHumi.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkShowHumi.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.chkShowHumi.Location = new System.Drawing.Point(106, 28);
+            this.chkShowHumi.Name = "chkShowHumi";
+            this.chkShowHumi.Size = new System.Drawing.Size(88, 24);
+            this.chkShowHumi.TabIndex = 2;
+            this.chkShowHumi.Text = "💧 湿度";
+            this.chkShowHumi.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            //
+            // chkShowPressure
+            //
+            this.chkShowPressure.Appearance = System.Windows.Forms.Appearance.Button;
+            this.chkShowPressure.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(255)))), ((int)(((byte)(220)))));
+            this.chkShowPressure.Checked = true;
+            this.chkShowPressure.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkShowPressure.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.chkShowPressure.Location = new System.Drawing.Point(200, 28);
+            this.chkShowPressure.Name = "chkShowPressure";
+            this.chkShowPressure.Size = new System.Drawing.Size(88, 24);
+            this.chkShowPressure.TabIndex = 3;
+            this.chkShowPressure.Text = "⚡ 气压";
+            this.chkShowPressure.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // gbSerial
             // 
@@ -243,7 +299,7 @@ namespace TempHumidityMonitor
             this.gbSerial.Controls.Add(this.cbBaudRate);
             this.gbSerial.Controls.Add(this.btnOpenCloseCom);
             this.gbSerial.Controls.Add(this.btnManualSend);
-            this.gbSerial.Location = new System.Drawing.Point(12, 35);
+            this.gbSerial.Location = new System.Drawing.Point(12, 55);
             this.gbSerial.Name = "gbSerial";
             this.gbSerial.Size = new System.Drawing.Size(280, 120);
             this.gbSerial.TabIndex = 1;
@@ -320,7 +376,7 @@ namespace TempHumidityMonitor
             this.gbWeb.Controls.Add(this.lblWebPort);
             this.gbWeb.Controls.Add(this.nudWebPort);
             this.gbWeb.Controls.Add(this.btnOpenWeb);
-            this.gbWeb.Location = new System.Drawing.Point(12, 162);
+            this.gbWeb.Location = new System.Drawing.Point(12, 182);
             this.gbWeb.Name = "gbWeb";
             this.gbWeb.Size = new System.Drawing.Size(280, 48);
             this.gbWeb.TabIndex = 8;
@@ -755,7 +811,7 @@ namespace TempHumidityMonitor
             0});
             // 
             // btnCleanDB
-            // 
+            //
             this.btnCleanDB.Location = new System.Drawing.Point(154, 101);
             this.btnCleanDB.Name = "btnCleanDB";
             this.btnCleanDB.Size = new System.Drawing.Size(110, 27);
@@ -763,11 +819,41 @@ namespace TempHumidityMonitor
             this.btnCleanDB.Text = "清理旧数据";
             this.btnCleanDB.UseVisualStyleBackColor = true;
             //
+            // btnTempDetail
+            //
+            this.btnTempDetail.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnTempDetail.Location = new System.Drawing.Point(12, 824);
+            this.btnTempDetail.Name = "btnTempDetail";
+            this.btnTempDetail.Size = new System.Drawing.Size(88, 28);
+            this.btnTempDetail.TabIndex = 8;
+            this.btnTempDetail.Text = "温度详情";
+            this.btnTempDetail.UseVisualStyleBackColor = true;
+            //
+            // btnHumiDetail
+            //
+            this.btnHumiDetail.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnHumiDetail.Location = new System.Drawing.Point(106, 824);
+            this.btnHumiDetail.Name = "btnHumiDetail";
+            this.btnHumiDetail.Size = new System.Drawing.Size(88, 28);
+            this.btnHumiDetail.TabIndex = 9;
+            this.btnHumiDetail.Text = "湿度详情";
+            this.btnHumiDetail.UseVisualStyleBackColor = true;
+            //
+            // btnPressureDetail
+            //
+            this.btnPressureDetail.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnPressureDetail.Location = new System.Drawing.Point(200, 824);
+            this.btnPressureDetail.Name = "btnPressureDetail";
+            this.btnPressureDetail.Size = new System.Drawing.Size(88, 28);
+            this.btnPressureDetail.TabIndex = 10;
+            this.btnPressureDetail.Text = "气压详情";
+            this.btnPressureDetail.UseVisualStyleBackColor = true;
+            //
             // lblStatus
-            // 
-            this.lblStatus.Location = new System.Drawing.Point(12, 828);
+            //
+            this.lblStatus.Location = new System.Drawing.Point(12, 856);
             this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(280, 40);
+            this.lblStatus.Size = new System.Drawing.Size(280, 20);
             this.lblStatus.TabIndex = 7;
             this.lblStatus.Text = "就绪";
             // 
@@ -1347,10 +1433,15 @@ namespace TempHumidityMonitor
             //
             this.cmsTray.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
                 new System.Windows.Forms.ToolStripMenuItem("显示窗口", null, new System.EventHandler(this.trayShow_Click)),
+                new System.Windows.Forms.ToolStripSeparator(),
+                new System.Windows.Forms.ToolStripMenuItem("温度详情", null, new System.EventHandler(this.trayTempDetail_Click)),
+                new System.Windows.Forms.ToolStripMenuItem("湿度详情", null, new System.EventHandler(this.trayHumiDetail_Click)),
+                new System.Windows.Forms.ToolStripMenuItem("气压详情", null, new System.EventHandler(this.trayPressureDetail_Click)),
+                new System.Windows.Forms.ToolStripSeparator(),
                 new System.Windows.Forms.ToolStripMenuItem("退出程序", null, new System.EventHandler(this.trayExit_Click))});
             this.cmsTray.ImageScalingSize = new System.Drawing.Size(20, 20);
             this.cmsTray.Name = "cmsTray";
-            this.cmsTray.Size = new System.Drawing.Size(139, 52);
+            this.cmsTray.Size = new System.Drawing.Size(139, 130);
             // 
             // MainForm
             // 
