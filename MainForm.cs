@@ -100,8 +100,8 @@ namespace TempHumidityMonitor
 
         private void MainForm_Shown(object sender, EventArgs e)
         {
-            splitContainer1.SplitterDistance = 340;
-            splitContainer1.Panel1MinSize = 300;
+            splitContainer1.SplitterDistance = 310;
+            splitContainer1.Panel1MinSize = 290;
             splitContainer1.Panel2MinSize = 200;
         }
 

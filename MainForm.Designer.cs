@@ -238,7 +238,7 @@ namespace TempHumidityMonitor
             this.splitContainer1.Panel2.Controls.Add(this.gbStatsPress);
             this.splitContainer1.Panel2.Controls.Add(this.gbHistory);
             this.splitContainer1.Size = new System.Drawing.Size(1222, 881);
-            this.splitContainer1.SplitterDistance = 340;
+            this.splitContainer1.SplitterDistance = 310;
             this.splitContainer1.TabIndex = 0;
             // 
             // btnTempDetail
@@ -335,7 +335,7 @@ namespace TempHumidityMonitor
             this.gbSerial.Controls.Add(this.btnManualSend);
             this.gbSerial.Location = new System.Drawing.Point(12, 55);
             this.gbSerial.Name = "gbSerial";
-            this.gbSerial.Size = new System.Drawing.Size(316, 120);
+            this.gbSerial.Size = new System.Drawing.Size(290, 120);
             this.gbSerial.TabIndex = 1;
             this.gbSerial.TabStop = false;
             this.gbSerial.Text = "串口设置";
@@ -412,7 +412,7 @@ namespace TempHumidityMonitor
             this.gbWeb.Controls.Add(this.btnOpenWeb);
             this.gbWeb.Location = new System.Drawing.Point(12, 182);
             this.gbWeb.Name = "gbWeb";
-            this.gbWeb.Size = new System.Drawing.Size(316, 50);
+            this.gbWeb.Size = new System.Drawing.Size(290, 50);
             this.gbWeb.TabIndex = 8;
             this.gbWeb.TabStop = false;
             this.gbWeb.Text = "网页监控";
@@ -467,7 +467,7 @@ namespace TempHumidityMonitor
             this.gbCollect.Controls.Add(this.nudMaxPoints);
             this.gbCollect.Location = new System.Drawing.Point(12, 238);
             this.gbCollect.Name = "gbCollect";
-            this.gbCollect.Size = new System.Drawing.Size(316, 115);
+            this.gbCollect.Size = new System.Drawing.Size(290, 115);
             this.gbCollect.TabIndex = 2;
             this.gbCollect.TabStop = false;
             this.gbCollect.Text = "采集设置";
@@ -591,7 +591,7 @@ namespace TempHumidityMonitor
             this.gbAlarm.Controls.Add(this.nudPressureLow);
             this.gbAlarm.Location = new System.Drawing.Point(12, 360);
             this.gbAlarm.Name = "gbAlarm";
-            this.gbAlarm.Size = new System.Drawing.Size(316, 295);
+            this.gbAlarm.Size = new System.Drawing.Size(290, 295);
             this.gbAlarm.TabIndex = 5;
             this.gbAlarm.TabStop = false;
             this.gbAlarm.Text = "报警设置";
@@ -793,7 +793,7 @@ namespace TempHumidityMonitor
             this.gbData.Controls.Add(this.btnCleanDB);
             this.gbData.Location = new System.Drawing.Point(12, 663);
             this.gbData.Name = "gbData";
-            this.gbData.Size = new System.Drawing.Size(316, 135);
+            this.gbData.Size = new System.Drawing.Size(290, 135);
             this.gbData.TabIndex = 6;
             this.gbData.TabStop = false;
             this.gbData.Text = "数据管理";
@@ -869,7 +869,7 @@ namespace TempHumidityMonitor
             // 
             this.lblStatus.Location = new System.Drawing.Point(12, 840);
             this.lblStatus.Name = "lblStatus";
-            this.lblStatus.Size = new System.Drawing.Size(316, 40);
+            this.lblStatus.Size = new System.Drawing.Size(290, 40);
             this.lblStatus.TabIndex = 7;
             this.lblStatus.Text = "就绪";
             // 
